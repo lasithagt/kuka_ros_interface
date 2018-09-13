@@ -92,7 +92,7 @@ int main (int argc, char** argv)
    ros::NodeHandle nh("~");
    
    // create new sine overlay client
-   LBRJointSineOverlayClient client(jointMask, frequency, amplitude, filterCoeff, nh);
+   LBRJointSineOverlayClient client(nh);
 
    /***************************************************************************/
    /*                                                                         */

@@ -165,11 +165,21 @@ target_link_libraries(kukaJointControl
    ${FRI_LIBRARIES}
  )
 
-add_executable(kukaSendCom  ./example/LBRJointSineOverlay/txtFileRead.cpp model/kukaLWR_DHnew.cpp)
-add_dependencies(kukaSendCom iiwa_msgs_generate_messages_cpp)
+add_executable(kukaCmd  ./example/LBRJointSineOverlay/send_data_cmd.cpp model/kukaLWR_DHnew.cpp)
+add_dependencies(kukaCmd iiwa_msgs_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(kukaSendCom
+target_link_libraries(kukaCmd
+   ${catkin_LIBRARIES}
+   orocos-kdl
+   ${FRI_LIBRARIES}
+)
+
+add_executable(saveData  ./example/LBRJointSineOverlay/save_data.cpp model/kukaLWR_DHnew.cpp)
+add_dependencies(saveData iiwa_msgs_generate_messages_cpp)
+
+## Specify libraries to link a library or executable target against
+target_link_libraries(saveData
    ${catkin_LIBRARIES}
    orocos-kdl
    ${FRI_LIBRARIES}

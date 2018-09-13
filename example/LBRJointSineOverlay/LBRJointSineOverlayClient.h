@@ -50,6 +50,7 @@ or otherwise, without the prior written consent of KUKA Roboter GmbH.
 
 #include <eigen3/Eigen/Dense>
 #include <trajectory_msgs/JointTrajectory.h>
+#include <std_msgs/Float32.h>
 
 #include <ecl/geometry.hpp>
 #include <ecl/containers.hpp>
@@ -76,8 +77,7 @@ public:
     * @param amplRad Sine amplitude in radians
     * @param filterCoeff Filter coefficient between 0 (filter off) and 1 (max filter)
     */
-   LBRJointSineOverlayClient(unsigned int jointMask, double freqHz, 
-         double amplRad, double filterCoeff, ros::NodeHandle &nh);
+   LBRJointSineOverlayClient(ros::NodeHandle &nh);
    
    /** 
     * \brief Destructor.
@@ -92,12 +92,17 @@ public:
     */
    virtual void onStateChange(ESessionState oldState, ESessionState newState);
 
-   virtual void publishState(double jointExtTorque[], double jointTorque[], double jointState[], double jointCommanded[]);
+   virtual void publishState(double jointExtTorque[], double jointTorque[], double jointState[], double jointCommanded[], double jointVelocity[]);
 
    virtual void getKUKAJointTrajCmd(const trajectory_msgs::JointTrajectory::ConstPtr& msg);
 
    virtual void getKUKAJointCmd(const iiwa_msgs::JointPosition::ConstPtr& msg);
+
+   virtual void getTrajPoints(const std_msgs::Float32::ConstPtr& msg);
    
+   void computeVelocity(double curr_joint_pos[], double* vel_measured);
+
+   void set_init_state(Eigen::VectorXd inits_kuka_env);
    /**
     * \brief Callback for the FRI state 'Commanding Active'.
     */
@@ -115,19 +120,23 @@ private:
    double _positions[LBRState::NUMBER_OF_JOINTS]; //!< commanded superposed torques
    bool _active_point;
    bool _active_traj;
-
+   bool _active_last_comm;
 
    ros::Subscriber sub_joint_position;
    ros::Subscriber sub_joint_position_traj;
+   ros::Subscriber n_traj_points_sub;
 
    ros::Publisher pub_position;
    ros::Publisher pub_position_com;
    ros::Publisher pub_torque;
    ros::Publisher pub_ext_torque;
+   ros::Publisher joint_vel_pub_;
 
    double t_min;
    double t_max;
    double _start_time;
+   double n_traj_points;
+   int n_pos_history;
 
    ros::Time curr_time;
 
@@ -138,6 +147,13 @@ private:
    ecl::CubicSpline sp_j5;
    ecl::CubicSpline sp_j6;
    ecl::CubicSpline sp_j7;
+
+   Eigen::Matrix<double, 7, 5> temp_joint_pos;
+   Eigen::Matrix<double, 7, 4> temp_joint_vel;
+   
+   Eigen::Matrix<double,4,1> filter_weights;
+   Eigen::VectorXd curr_velocity;
+
 };
 
 #endif // _KUKA_FRI_LBR_JOINT_SINE_OVERLAY_CLIENT_H
