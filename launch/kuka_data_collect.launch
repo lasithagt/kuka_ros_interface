@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<launch>
+	<arg name="robot_name"/>
+	<param name="dir_" type="str" value="/home/lasitha/Documents/ROS_ws/kuka_ws/src/kuka_torque/example/paths/desired_position_full_120.txt"/> 
+
+	<node pkg="kuka_torque" type="kukaCmd" name="sendCmdData" output="screen"> </node>
+	<node pkg="kuka_torque" type="saveData" name="SaveData" output="screen"> </node>
+
+	<node name="netft_node" pkg="netft_utils" type="netft_node" respawn="false" output="screen" args="192.168.0.127"/>
+
+	<!-- run the robot interface driver so that we can see robot transforms -->
+	<!--node pkg="kuka_torque" type="kukaSendCom" name="sendCmdData" output="screen"> </node-->
+</launch>

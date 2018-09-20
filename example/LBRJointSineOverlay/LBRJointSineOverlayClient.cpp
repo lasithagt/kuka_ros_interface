@@ -168,10 +168,8 @@ void LBRJointSineOverlayClient::command()
 
    } else {
 
-      if (_active_last_comm == true) {
-        memcpy(_positions, robotState().getMeasuredJointPosition(), LBRState::NUMBER_OF_JOINTS * sizeof(double));
+      memcpy(_positions, robotState().getMeasuredJointPosition(), LBRState::NUMBER_OF_JOINTS * sizeof(double));
 
-      }
    }
 
    // Set the position of the robot to desired.
