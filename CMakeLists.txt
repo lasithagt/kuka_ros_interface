@@ -8,7 +8,8 @@ add_compile_options(-std=c++11)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
-  iiwa_ros
+  # iiwa_ros
+  iiwa_msgs
   roscpp
   trajectory_msgs
   ecl_geometry)
@@ -105,7 +106,7 @@ find_package(orocos_kdl REQUIRED)
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES kuka_torque
-   CATKIN_DEPENDS ecl_geometry
+   CATKIN_DEPENDS ecl_geometry iiwa_msgs 
 #  DEPENDS system_lib
 )
 
@@ -145,7 +146,7 @@ FIND_LIBRARY(FRI_LIBRARIES libFRIClient.a ./lib)
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 
-add_executable(kukaTorque ./example/LBRTorqueSineOverlay/LBRTorqueSineOverlayClient.h ./example/LBRTorqueSineOverlay/LBRTorqueSineOverlayApp.cpp ./example/LBRTorqueSineOverlay/LBRTorqueSineOverlayClient.cpp model/kukaLWR_DHnew.cpp)
+add_executable(kukaTorque ./scripts/LBRTorqueSineOverlay/LBRTorqueSineOverlayClient.h ./scripts/LBRTorqueSineOverlay/LBRTorqueSineOverlayApp.cpp ./scripts/LBRTorqueSineOverlay/LBRTorqueSineOverlayClient.cpp model/kukaLWR_DHnew.cpp)
 add_dependencies(kukaTorque iiwa_msgs_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
@@ -155,7 +156,7 @@ target_link_libraries(kukaTorque
    ${FRI_LIBRARIES}
  )
 
-add_executable(kukaJointControl ./example/LBRJointSineOverlay/LBRJointSineOverlayClient.h ./example/LBRJointSineOverlay/LBRJointSineOverlayApp.cpp ./example/LBRJointSineOverlay/LBRJointSineOverlayClient.cpp model/kukaLWR_DHnew.cpp)
+add_executable(kukaJointControl ./scripts/LBRJointSineOverlay/LBRJointSineOverlayClient.h ./scripts/LBRJointSineOverlay/LBRJointSineOverlayApp.cpp ./scripts/LBRJointSineOverlay/LBRJointSineOverlayClient.cpp model/kukaLWR_DHnew.cpp)
 add_dependencies(kukaJointControl iiwa_msgs_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
@@ -165,7 +166,7 @@ target_link_libraries(kukaJointControl
    ${FRI_LIBRARIES}
  )
 
-add_executable(kukaCmd  ./example/LBRJointSineOverlay/send_data_cmd.cpp model/kukaLWR_DHnew.cpp)
+add_executable(kukaCmd  ./scripts/LBRJointSineOverlay/send_data_cmd.cpp model/kukaLWR_DHnew.cpp)
 add_dependencies(kukaCmd iiwa_msgs_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
@@ -175,7 +176,7 @@ target_link_libraries(kukaCmd
    ${FRI_LIBRARIES}
 )
 
-add_executable(saveData  ./example/LBRJointSineOverlay/save_data.cpp model/kukaLWR_DHnew.cpp)
+add_executable(saveData  ./scripts/LBRJointSineOverlay/save_data.cpp model/kukaLWR_DHnew.cpp)
 add_dependencies(saveData iiwa_msgs_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against

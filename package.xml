@@ -52,6 +52,8 @@
   <buildtool_depend>catkin</buildtool_depend>
   <build_depend>ecl_geometry</build_depend>
   <run_depend>ecl_geometry</run_depend>
+  <build_depend>iiwa_msgs</build_depend>
+  <run_depend>iiwa_msgs</run_depend>
 
 
   <!-- The export tag contains other, unspecified, tags -->
