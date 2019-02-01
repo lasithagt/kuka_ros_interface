@@ -221,15 +221,15 @@ void LBRJointSineOverlayClient::publishState(double jointExtTorque[], double joi
 // This function is to compute the torque input to the KUKA arm.
 void LBRJointSineOverlayClient::getKUKAJointCmd(const iiwa_msgs::JointPosition::ConstPtr& msg) {
   _active_point = 1;
-  /*
-  _positions[0] = msg->position.a1;
-  _positions[1] = msg->position.a2;
-  _positions[2] = msg->position.a3;
-  _positions[3] = msg->position.a4;
-  _positions[4] = msg->position.a5;
-  _positions[5] = msg->position.a6;
-  _positions[6] = msg->position.a7;
-  */
+  
+  _positions[0] = msg->position.quantity.at(0);
+  _positions[1] = msg->position.quantity.at(1);
+  _positions[2] = msg->position.quantity.at(2);
+  _positions[3] = msg->position.quantity.at(3);
+  _positions[4] = msg->position.quantity.at(4);
+  _positions[5] = msg->position.quantity.at(5);
+  _positions[6] = msg->position.quantity.at(6);
+
 }
 
 // This function is to compute the torque input to the KUKA arm.
