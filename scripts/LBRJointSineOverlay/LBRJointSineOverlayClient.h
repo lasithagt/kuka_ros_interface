@@ -56,6 +56,7 @@ or otherwise, without the prior written consent of KUKA Roboter GmbH.
 #include <eigen3/Eigen/Dense>
 #include <trajectory_msgs/JointTrajectory.h>
 #include <std_msgs/Float32.h>
+#include <std_msgs/Time.h>
 
 #include <ecl/geometry.hpp>
 #include <ecl/containers.hpp>
@@ -97,7 +98,7 @@ public:
     */
    virtual void onStateChange(ESessionState oldState, ESessionState newState);
 
-   virtual void publishState(double jointExtTorque[], double jointTorque[], double jointState[], double jointCommanded[], double jointVelocity[]);
+   virtual void publishState(double jointExtTorque[], double jointTorque[], double jointState[], double jointCommanded[], double jointVelocity[], std_msgs::Time kuka_time);
 
    virtual void getKUKAJointTrajCmd(const trajectory_msgs::JointTrajectory::ConstPtr& msg);
 
@@ -136,6 +137,9 @@ private:
    ros::Publisher pub_torque;
    ros::Publisher pub_ext_torque;
    ros::Publisher joint_vel_pub_;
+   ros::Publisher pub_kuka_time;
+
+   std_msgs::Time curr_time;
 
    double t_min;
    double t_max;
@@ -143,7 +147,11 @@ private:
    double n_traj_points;
    int n_pos_history;
 
-   ros::Time curr_time;
+   iiwa_msgs::JointTorque kukaTorque;
+   iiwa_msgs::JointTorque kukaExtTorque;
+   iiwa_msgs::JointPosition kukaPosition;
+   iiwa_msgs::JointPosition kukaPositionCommanded;
+   iiwa_msgs::JointVelocity kukaVelocity;
 
    ecl::CubicSpline sp_j1;
    ecl::CubicSpline sp_j2;
