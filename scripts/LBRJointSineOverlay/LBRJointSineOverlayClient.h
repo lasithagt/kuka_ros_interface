@@ -98,7 +98,7 @@ public:
     */
    virtual void onStateChange(ESessionState oldState, ESessionState newState);
 
-   virtual void publishState(double jointExtTorque[], double jointTorque[], double jointState[], double jointCommanded[], double jointVelocity[], std_msgs::Time kuka_time);
+   virtual void publishState(double jointExtTorque[], double jointTorque[], double jointState[], double jointIpoState[], double jointCommanded[], double jointVelocity[], std_msgs::Time kuka_time);
 
    virtual void getKUKAJointTrajCmd(const trajectory_msgs::JointTrajectory::ConstPtr& msg);
 
@@ -134,6 +134,7 @@ private:
 
    ros::Publisher pub_position;
    ros::Publisher pub_position_com;
+   ros::Publisher pub_position_Ipo;
    ros::Publisher pub_torque;
    ros::Publisher pub_ext_torque;
    ros::Publisher joint_vel_pub_;
@@ -150,6 +151,7 @@ private:
    iiwa_msgs::JointTorque kukaTorque;
    iiwa_msgs::JointTorque kukaExtTorque;
    iiwa_msgs::JointPosition kukaPosition;
+   iiwa_msgs::JointPosition kukaPositionIpo;
    iiwa_msgs::JointPosition kukaPositionCommanded;
    iiwa_msgs::JointVelocity kukaVelocity;
 

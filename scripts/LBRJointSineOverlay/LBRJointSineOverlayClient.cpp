@@ -88,6 +88,7 @@ LBRJointSineOverlayClient::LBRJointSineOverlayClient(ros::NodeHandle &nh)
   pub_ext_torque   = nh.advertise<iiwa_msgs::JointTorque>("/kuka/state/KUKAExtTorque", 1); 
   pub_position     = nh.advertise<iiwa_msgs::JointPosition>("/kuka/state/KUKAJointPosition", 1); 
   pub_position_com = nh.advertise<iiwa_msgs::JointPosition>("/kuka/state/KUKAJointPositionCommand", 1); 
+  pub_position_Ipo = nh.advertise<iiwa_msgs::JointPosition>("/kuka/state/KUKAJointPositionIpo", 1);
   joint_vel_pub_   = nh.advertise<iiwa_msgs::JointVelocity>("/kuka/state/KUKAJointVelocity", 1);   
   pub_kuka_time    = nh.advertise<std_msgs::Time>("/kuka/state/KUKATime", 1);
 
@@ -96,6 +97,7 @@ LBRJointSineOverlayClient::LBRJointSineOverlayClient(ros::NodeHandle &nh)
   kukaExtTorque.torque.quantity.resize(LBRState::NUMBER_OF_JOINTS);
   kukaPosition.position.quantity.resize(LBRState::NUMBER_OF_JOINTS);
   kukaPositionCommanded.position.quantity.resize(LBRState::NUMBER_OF_JOINTS);
+  kukaPositionIpo.position.quantity.resize(LBRState::NUMBER_OF_JOINTS);
   kukaVelocity.velocity.quantity.resize(LBRState::NUMBER_OF_JOINTS);
 
   // Set current time to zero
@@ -109,6 +111,12 @@ LBRJointSineOverlayClient::LBRJointSineOverlayClient(ros::NodeHandle &nh)
   }
 
   temp_joint_vel = Eigen::MatrixXd::Zero(7, n_pos_history-1);
+
+  // Initialize filters.
+  // const double cutoff_hz = 40;
+  // vel_filters_.resize(
+  // num_joints_, DiscreteTimeLowPassFilter<double>(cutoff_hz, kTimeStep));
+  // utime_last_.resize(num_robots, -1);
 
   }
   
@@ -153,16 +161,18 @@ void LBRJointSineOverlayClient::command()
    double joint_commanded[LBRState::NUMBER_OF_JOINTS];
    memcpy(joint_commanded, robotState().getCommandedJointPosition(), LBRState::NUMBER_OF_JOINTS * sizeof(double));
 
+   double joint_Ipo[LBRState::NUMBER_OF_JOINTS];
+   memcpy(joint_Ipo, robotState().getIpoJointPosition(), LBRState::NUMBER_OF_JOINTS * sizeof(double));   
+
    curr_time.data.sec  = (robotState().getTimestampSec());
    curr_time.data.nsec = (robotState().getTimestampNanoSec());
 
    computeVelocity(curr_joint_pos, curr_velocity);
    
    // If the joint trajectory has been published, 
-   publishState(joint_ext_torque, joint_measure_torque, curr_joint_pos, joint_commanded, curr_velocity, curr_time);
-   // t = ros::Time().now().toSec() - _start_time;
+   publishState(joint_ext_torque, joint_measure_torque, curr_joint_pos, joint_Ipo, joint_commanded, curr_velocity, curr_time);
    if (_active_point == 1) {
-
+    // Make this concise
      _positions[0] = _positions[0];
      _positions[1] = _positions[1];
      _positions[2] = _positions[2];
@@ -200,7 +210,7 @@ void LBRJointSineOverlayClient::computeVelocity(double curr_joint_pos[], double*
 
 }
 
-void LBRJointSineOverlayClient::publishState(double jointExtTorque[], double jointTorque[], double jointState[], double jointStateCommanded[], double jointVelocity[], std_msgs::Time kuka_time)
+void LBRJointSineOverlayClient::publishState(double jointExtTorque[], double jointTorque[], double jointState[], double jointStateIpo[], double jointStateCommanded[], double jointVelocity[], std_msgs::Time kuka_time)
 {
   // kukaExtTorque.torque.time_from_start = ros::Time::now();
   memcpy(kukaExtTorque.torque.quantity.data(), jointExtTorque, 7*sizeof(double));
@@ -209,19 +219,33 @@ void LBRJointSineOverlayClient::publishState(double jointExtTorque[], double joi
 
   memcpy(kukaTorque.torque.quantity.data(), jointTorque, 7*sizeof(double));
   kukaTorque.header.stamp.sec = kuka_time.data.sec;
-  kukaTorque.header.stamp.nsec = kuka_time.data.sec;
+  kukaTorque.header.stamp.nsec = kuka_time.data.nsec;
 
   memcpy(kukaPosition.position.quantity.data(), jointState, 7*sizeof(double));
   kukaPosition.header.stamp.sec = kuka_time.data.sec;
-  kukaPosition.header.stamp.nsec = kuka_time.data.sec;
+  kukaPosition.header.stamp.nsec = kuka_time.data.nsec;
+
+  memcpy(kukaPositionIpo.position.quantity.data(), jointStateIpo, 7*sizeof(double));
+  kukaPositionIpo.header.stamp.sec = kuka_time.data.sec;
+  kukaPositionIpo.header.stamp.nsec = kuka_time.data.nsec;
 
   memcpy(kukaPositionCommanded.position.quantity.data(), jointStateCommanded, 7*sizeof(double));
   kukaPositionCommanded.header.stamp.sec = kuka_time.data.sec;
-  kukaPositionCommanded.header.stamp.nsec = kuka_time.data.sec;
+  kukaPositionCommanded.header.stamp.nsec = kuka_time.data.nsec;
+
+      // Velocity filtering.
+    /*if (robot_dt != 0.) {
+      for (int i = 0; i < kNumJoints; i++) {
+        const int index = joint_offset + i;
+        const double q_diff = state.getMeasuredJointPosition()[i] -
+                              lcm_status_.joint_position_measured[index];
+        lcm_status_.joint_velocity_estimated[index] =
+            vel_filters_[index].filter(q_diff / robot_dt);
+}*/
 
   memcpy(kukaVelocity.velocity.quantity.data(), jointVelocity, 7*sizeof(double));
   kukaVelocity.header.stamp.sec = kuka_time.data.sec;
-  kukaVelocity.header.stamp.nsec = kuka_time.data.sec;
+  kukaVelocity.header.stamp.nsec = kuka_time.data.nsec;
 
   curr_time.data.sec = kuka_time.data.sec;
   curr_time.data.nsec = kuka_time.data.nsec;
@@ -229,6 +253,7 @@ void LBRJointSineOverlayClient::publishState(double jointExtTorque[], double joi
   pub_torque.publish(kukaTorque);
   pub_ext_torque.publish(kukaExtTorque);
   pub_position.publish(kukaPosition);
+  pub_position_Ipo.publish(kukaPositionIpo);
   pub_position_com.publish(kukaPositionCommanded);
   joint_vel_pub_.publish(kukaVelocity);
   pub_kuka_time.publish(curr_time);
@@ -239,13 +264,7 @@ void LBRJointSineOverlayClient::publishState(double jointExtTorque[], double joi
 void LBRJointSineOverlayClient::getKUKAJointCmd(const iiwa_msgs::JointPosition::ConstPtr& msg) {
   _active_point = 1;
   
-  _positions[0] = msg->position.quantity.at(0);
-  _positions[1] = msg->position.quantity.at(1);
-  _positions[2] = msg->position.quantity.at(2);
-  _positions[3] = msg->position.quantity.at(3);
-  _positions[4] = msg->position.quantity.at(4);
-  _positions[5] = msg->position.quantity.at(5);
-  _positions[6] = msg->position.quantity.at(6);
+  memcpy(_positions, msg->position.quantity.data(), 7*sizeof(double));
   
 }
 
