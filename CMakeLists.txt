@@ -73,25 +73,6 @@ find_package(orocos_kdl REQUIRED)
 #   std_msgs  # Or other packages containing msgs
 # )
 
-################################################
-## Declare ROS dynamic reconfigure parameters ##
-################################################
-
-## To declare and build dynamic reconfigure parameters within this
-## package, follow these steps:
-## * In the file package.xml:
-##   * add a build_depend and a exec_depend tag for "dynamic_reconfigure"
-## * In this file (CMakeLists.txt):
-##   * add "dynamic_reconfigure" to
-##     find_package(catkin REQUIRED COMPONENTS ...)
-##   * uncomment the "generate_dynamic_reconfigure_options" section below
-##     and list every .cfg file to be processed
-
-## Generate dynamic reconfigure parameters in the 'cfg' folder
-# generate_dynamic_reconfigure_options(
-#   cfg/DynReconf1.cfg
-#   cfg/DynReconf2.cfg
-# )
 
 ###################################
 ## catkin specific configuration ##
@@ -124,7 +105,7 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
   include $./build/GNUMake/paths.mak
   include $./build/GNUMake/$(TOOLS_MAK)
-  #include $./build/GNUMake/rules_examples.mak
+  include $./build/GNUMake/rules_examples.mak
   ${orocos_kdl_INCLUDE_DIRS}
   ${Boost_INCLUDE_DIR}
 )
@@ -165,25 +146,25 @@ target_link_libraries(kukaJointControl
    ${FRI_LIBRARIES}
  )
 
-add_executable(kukaCmd  ./example/LBRJointSineOverlay/send_data_cmd.cpp model/kukaLWR_DHnew.cpp)
-add_dependencies(kukaCmd iiwa_msgs_generate_messages_cpp)
+#add_executable(kukaCmd  ./example/LBRJointSineOverlay/send_data_cmd.cpp model/kukaLWR_DHnew.cpp)
+#add_dependencies(kukaCmd iiwa_msgs_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(kukaCmd
-   ${catkin_LIBRARIES}
-   orocos-kdl
-   ${FRI_LIBRARIES}
-)
+#target_link_libraries(kukaCmd
+#   ${catkin_LIBRARIES}
+#   orocos-kdl
+#   ${FRI_LIBRARIES}
+#)
 
-add_executable(saveData  ./example/LBRJointSineOverlay/save_data.cpp model/kukaLWR_DHnew.cpp)
-add_dependencies(saveData iiwa_msgs_generate_messages_cpp)
+#add_executable(saveData  ./example/LBRJointSineOverlay/save_data.cpp model/kukaLWR_DHnew.cpp)
+#add_dependencies(saveData iiwa_msgs_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(saveData
-   ${catkin_LIBRARIES}
-   orocos-kdl
-   ${FRI_LIBRARIES}
-)
+#target_link_libraries(saveData
+#   ${catkin_LIBRARIES}
+#   orocos-kdl
+#   ${FRI_LIBRARIES}
+#)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
