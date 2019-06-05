@@ -43,15 +43,10 @@ or otherwise, without the prior written consent of KUKA Roboter GmbH.
 #include <vector>
 #include <Eigen/StdVector>
 #include <Eigen/Dense>
-// #include <iiwa_ros/conversions.h>
-// #include <kdl/chainjnttojacsolver.hpp>
-// #include <kdl/chainjnttojacdotsolver.hpp>
+
 #include <models.hpp>
 #include <kdl/framevel.hpp>
 
-#include <string.h>
-#include <stdio.h>
-#include <math.h>
 #include "LBRJointSineOverlayClient.h"
 #include "friLBRState.h"
 
@@ -73,15 +68,15 @@ LBRJointSineOverlayClient::LBRJointSineOverlayClient(ros::NodeHandle &nh)
    : _active_point(0.0)
    ,_active_traj(0.0)
    ,_active_last_comm(false)
+   ,command_active(false)
    ,_start_time(0.0)
 {
    printf("KUKA LBR initilized ...\n");
 
 
   // Subscribers
-  sub_joint_position_traj = nh.subscribe("/kuka/command/command_u_traj", 1, &LBRJointSineOverlayClient::getKUKAJointTrajCmd, this);
   sub_joint_position      = nh.subscribe("/kuka/command/command_position", 1, &LBRJointSineOverlayClient::getKUKAJointCmd, this);
-  n_traj_points_sub       = nh.subscribe("/mpc/trajpoints", 10, &LBRJointSineOverlayClient::getTrajPoints, this);
+  sub_command_active      = nh.subscribe("/kuka/command/active", 1, &LBRJointSineOverlayClient::is_command_active, this);
 
   // Publishers
   pub_torque       = nh.advertise<iiwa_msgs::JointTorque>("/kuka/state/KUKAActualTorque", 1); 
@@ -171,20 +166,11 @@ void LBRJointSineOverlayClient::command()
    
    // If the joint trajectory has been published, 
    publishState(joint_ext_torque, joint_measure_torque, curr_joint_pos, joint_Ipo, joint_commanded, curr_velocity, curr_time);
-   if (_active_point == 1) {
-    // Make this concise
-     _positions[0] = _positions[0];
-     _positions[1] = _positions[1];
-     _positions[2] = _positions[2];
-     _positions[3] = _positions[3];
-     _positions[4] = _positions[4];
-     _positions[5] = _positions[5];
-     _positions[6] = _positions[6];
-     std::cout << joint_commanded[0] << " " << joint_commanded[1] << " " << joint_commanded[2] << " " << joint_commanded[3] << " " << joint_commanded[4] <<  std::endl;
-     std::cout << curr_joint_pos[0] << " " << curr_joint_pos[1] << " " << curr_joint_pos[2] << " " << curr_joint_pos[3] << " " << curr_joint_pos[4] <<  std::endl; 
-   } else {
+
+
+   if (command_active == false) {
       memcpy(_positions, robotState().getMeasuredJointPosition(), LBRState::NUMBER_OF_JOINTS * sizeof(double));
-   }
+   } 
 
    // Set the position of the robot to desired.
    robotCommand().setJointPosition(_positions);
@@ -212,40 +198,23 @@ void LBRJointSineOverlayClient::computeVelocity(double curr_joint_pos[], double*
 
 void LBRJointSineOverlayClient::publishState(double jointExtTorque[], double jointTorque[], double jointState[], double jointStateIpo[], double jointStateCommanded[], double jointVelocity[], std_msgs::Time kuka_time)
 {
-  // kukaExtTorque.torque.time_from_start = ros::Time::now();
   memcpy(kukaExtTorque.torque.quantity.data(), jointExtTorque, 7*sizeof(double));
-  kukaExtTorque.header.stamp.sec = kuka_time.data.sec;
-  kukaExtTorque.header.stamp.nsec = kuka_time.data.nsec;
+  kukaExtTorque.header.stamp = ros::Time::now();
 
   memcpy(kukaTorque.torque.quantity.data(), jointTorque, 7*sizeof(double));
-  kukaTorque.header.stamp.sec = kuka_time.data.sec;
-  kukaTorque.header.stamp.nsec = kuka_time.data.nsec;
+  kukaTorque.header.stamp = ros::Time::now();
 
   memcpy(kukaPosition.position.quantity.data(), jointState, 7*sizeof(double));
-  kukaPosition.header.stamp.sec = kuka_time.data.sec;
-  kukaPosition.header.stamp.nsec = kuka_time.data.nsec;
+  kukaPosition.header.stamp = ros::Time::now();
 
   memcpy(kukaPositionIpo.position.quantity.data(), jointStateIpo, 7*sizeof(double));
-  kukaPositionIpo.header.stamp.sec = kuka_time.data.sec;
-  kukaPositionIpo.header.stamp.nsec = kuka_time.data.nsec;
+  kukaPositionIpo.header.stamp = ros::Time::now();
 
   memcpy(kukaPositionCommanded.position.quantity.data(), jointStateCommanded, 7*sizeof(double));
-  kukaPositionCommanded.header.stamp.sec = kuka_time.data.sec;
-  kukaPositionCommanded.header.stamp.nsec = kuka_time.data.nsec;
-
-      // Velocity filtering.
-    /*if (robot_dt != 0.) {
-      for (int i = 0; i < kNumJoints; i++) {
-        const int index = joint_offset + i;
-        const double q_diff = state.getMeasuredJointPosition()[i] -
-                              lcm_status_.joint_position_measured[index];
-        lcm_status_.joint_velocity_estimated[index] =
-            vel_filters_[index].filter(q_diff / robot_dt);
-}*/
+  kukaPositionCommanded.header.stamp = ros::Time::now();
 
   memcpy(kukaVelocity.velocity.quantity.data(), jointVelocity, 7*sizeof(double));
-  kukaVelocity.header.stamp.sec = kuka_time.data.sec;
-  kukaVelocity.header.stamp.nsec = kuka_time.data.nsec;
+  kukaVelocity.header.stamp = ros::Time::now();
 
   curr_time.data.sec = kuka_time.data.sec;
   curr_time.data.nsec = kuka_time.data.nsec;
@@ -264,77 +233,25 @@ void LBRJointSineOverlayClient::publishState(double jointExtTorque[], double joi
 void LBRJointSineOverlayClient::getKUKAJointCmd(const iiwa_msgs::JointPosition::ConstPtr& msg) {
   _active_point = 1;
   
-  memcpy(_positions, msg->position.quantity.data(), 7*sizeof(double));
-  
-}
+  /*if ((msg.header.stamp.toSec() - ros::Time::now.toSec()) {
 
-// This function is to compute the torque input to the KUKA arm.
-void LBRJointSineOverlayClient::getKUKAJointTrajCmd(const trajectory_msgs::JointTrajectory::ConstPtr& msg) {
-
-   // Toggle this to get traj command activated
-   
-   int n_len = msg->points.size();
-
-   ecl::Array<double> t(n_len);
-   ecl::Array<double> j1(n_len);
-   ecl::Array<double> j2(n_len);
-   ecl::Array<double> j3(n_len);
-   ecl::Array<double> j4(n_len);
-   ecl::Array<double> j5(n_len);
-   ecl::Array<double> j6(n_len);
-   ecl::Array<double> j7(n_len);
-
-   double original_freq = 0.02; // The rate at which controls are sent out.
-
-   if (n_len > 1) {
-     for (int i = 0; i < n_len; i++) {
-
-        t[i]  = original_freq * i;                       // msg->points.at(i).time_from_start.sec + (double)msg->points.at(i).time_from_start.nsec * pow(10,-9);
-        j1[i] = msg->points.at(i).positions.at(1);
-        j2[i] = msg->points.at(i).positions.at(2);
-        j3[i] = msg->points.at(i).positions.at(3);
-        j4[i] = msg->points.at(i).positions.at(4);
-        j5[i] = msg->points.at(i).positions.at(5);
-        j6[i] = msg->points.at(i).positions.at(6);
-        j7[i] = msg->points.at(i).positions.at(7);
-     }
-
-    sp_j1 = ecl::CubicSpline::ContinuousDerivatives(t,j1,0,0);
-    sp_j2 = ecl::CubicSpline::ContinuousDerivatives(t,j2,0,0);
-    sp_j3 = ecl::CubicSpline::ContinuousDerivatives(t,j3,0,0);
-    sp_j4 = ecl::CubicSpline::ContinuousDerivatives(t,j4,0,0);
-    sp_j5 = ecl::CubicSpline::ContinuousDerivatives(t,j5,0,0);
-    sp_j6 = ecl::CubicSpline::ContinuousDerivatives(t,j6,0,0);
-    sp_j7 = ecl::CubicSpline::ContinuousDerivatives(t,j7,0,0);
-    
-  }
-  
-  /*if (t.size() == 1) {
-    _active_traj = 0;
-    _active_last_comm = true;
-  } else {
-    _active_traj = 1;
   }*/
-
-  if (n_traj_points-2 == msg->header.seq) {
-    ROS_INFO_STREAM("Last" <<  std::endl);
-    _active_traj = false;
-    _active_last_comm = true;
-  } else {
-    _active_traj = true;
-  }
-  _start_time = (double)msg->header.stamp.sec + (double)(msg->header.stamp.nsec) * pow(10,-9);
-
-}
-
-// Set the inital states of the kuka_env states (first 17 states)
-void LBRJointSineOverlayClient::set_init_state(Eigen::VectorXd inits_kuka_env) {
-    
-    for (int i=0; i < n_pos_history; i++) {
-      temp_joint_pos.col(i) = (inits_kuka_env.array()).segment(0,7);    
+  bool is_valid = true;
+  for (int i = 0;i < 7;i++) {
+    if (abs(kukaPosition.position.quantity[i] - msg->position.quantity[i]) > 0.1) {
+      is_valid = false;
     }
+
+  }
+  if (is_valid = true) {
+    memcpy(_positions, msg->position.quantity.data(), 7*sizeof(double));
+  } else {
+    memcpy(_positions, kukaPosition.position.quantity.data(), LBRState::NUMBER_OF_JOINTS * sizeof(double));
+  }
+  
 }
 
-void LBRJointSineOverlayClient::getTrajPoints(const std_msgs::Float32::ConstPtr& msg) {
-    n_traj_points = (double)msg->data;
+
+void LBRJointSineOverlayClient::is_command_active(const std_msgs::Bool::ConstPtr& msg) {
+  command_active = msg->data;
 }

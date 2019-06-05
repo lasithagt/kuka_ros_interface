@@ -57,6 +57,7 @@ or otherwise, without the prior written consent of KUKA Roboter GmbH.
 #include <trajectory_msgs/JointTrajectory.h>
 #include <std_msgs/Float32.h>
 #include <std_msgs/Time.h>
+#include <std_msgs/Bool.h>
 
 #include <ecl/geometry.hpp>
 #include <ecl/containers.hpp>
@@ -100,15 +101,12 @@ public:
 
    virtual void publishState(double jointExtTorque[], double jointTorque[], double jointState[], double jointIpoState[], double jointCommanded[], double jointVelocity[], std_msgs::Time kuka_time);
 
-   virtual void getKUKAJointTrajCmd(const trajectory_msgs::JointTrajectory::ConstPtr& msg);
 
    virtual void getKUKAJointCmd(const iiwa_msgs::JointPosition::ConstPtr& msg);
-
-   virtual void getTrajPoints(const std_msgs::Float32::ConstPtr& msg);
    
    void computeVelocity(double curr_joint_pos[], double* vel_measured);
 
-   void set_init_state(Eigen::VectorXd inits_kuka_env);
+   void is_command_active(const std_msgs::Bool::ConstPtr& msg); 
    /**
     * \brief Callback for the FRI state 'Commanding Active'.
     */
@@ -127,10 +125,12 @@ private:
    bool _active_point;
    bool _active_traj;
    bool _active_last_comm;
+   bool command_active;
 
    ros::Subscriber sub_joint_position;
    ros::Subscriber sub_joint_position_traj;
    ros::Subscriber n_traj_points_sub;
+   ros::Subscriber sub_command_active;
 
    ros::Publisher pub_position;
    ros::Publisher pub_position_com;
@@ -145,7 +145,6 @@ private:
    double t_min;
    double t_max;
    double _start_time;
-   double n_traj_points;
    int n_pos_history;
 
    iiwa_msgs::JointTorque kukaTorque;
@@ -155,13 +154,6 @@ private:
    iiwa_msgs::JointPosition kukaPositionCommanded;
    iiwa_msgs::JointVelocity kukaVelocity;
 
-   ecl::CubicSpline sp_j1;
-   ecl::CubicSpline sp_j2;
-   ecl::CubicSpline sp_j3;
-   ecl::CubicSpline sp_j4;
-   ecl::CubicSpline sp_j5;
-   ecl::CubicSpline sp_j6;
-   ecl::CubicSpline sp_j7;
 
    Eigen::Matrix<double, 7, 5> temp_joint_pos;
    Eigen::Matrix<double, 7, 4> temp_joint_vel;
