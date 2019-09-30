@@ -47,10 +47,11 @@ or otherwise, without the prior written consent of KUKA Roboter GmbH.
 #include <models.hpp>
 #include <kdl/framevel.hpp>
 
-#include "LBRJointSineOverlayClient.h"
+#include "KUKAJointControlClient.h"
 #include "friLBRState.h"
 
 #include <eigen3/Eigen/Core>
+#include <boost/algorithm/cxx11/any_of.hpp> 
 
   // The classes
 using ecl::CubicSpline;
@@ -64,19 +65,18 @@ using ecl::CubicSpline;
 #endif
 
 //******************************************************************************
-LBRJointSineOverlayClient::LBRJointSineOverlayClient(ros::NodeHandle &nh) 
-   : _active_point(0.0)
-   ,_active_traj(0.0)
-   ,_active_last_comm(false)
-   ,command_active(false)
-   ,_start_time(0.0)
+KUKAJointControl::KUKAJointControl(ros::NodeHandle &nh) 
+   :command_active(false)
+   ,is_valid(false)
+   ,sample_time(0.0)
+   ,is_command(false)
 {
    printf("KUKA LBR initilized ...\n");
 
 
   // Subscribers
-  sub_joint_position      = nh.subscribe("/kuka/command/command_position", 1, &LBRJointSineOverlayClient::getKUKAJointCmd, this);
-  sub_command_active      = nh.subscribe("/kuka/command/active", 1, &LBRJointSineOverlayClient::is_command_active, this);
+  sub_joint_position = nh.subscribe("/kuka/command/command_position", 1, &KUKAJointControl::getKUKAJointCmd, this);
+  sub_command_active = nh.subscribe("/kuka/command/active", 1, &KUKAJointControl::is_command_active, this);
 
   // Publishers
   pub_torque       = nh.advertise<iiwa_msgs::JointTorque>("/kuka/state/KUKAActualTorque", 1); 
@@ -108,19 +108,19 @@ LBRJointSineOverlayClient::LBRJointSineOverlayClient(ros::NodeHandle &nh)
   temp_joint_vel = Eigen::MatrixXd::Zero(7, n_pos_history-1);
 
   // Initialize filters.
-  // const double cutoff_hz = 40;
-  // vel_filters_.resize(
-  // num_joints_, DiscreteTimeLowPassFilter<double>(cutoff_hz, kTimeStep));
-  // utime_last_.resize(num_robots, -1);
+  const double cutoff_hz = 40;
+  lp_filter = new DiscreteTimeLowPassFilter<double>(cutoff_hz, sample_time);
 
   }
   
 //******************************************************************************
-LBRJointSineOverlayClient::~LBRJointSineOverlayClient()
-{}
+KUKAJointControl::~KUKAJointControl()
+{
+  delete(lp_filter);
+}
       
 //******************************************************************************
-void LBRJointSineOverlayClient::onStateChange(ESessionState oldState, ESessionState newState)
+void KUKAJointControl::onStateChange(ESessionState oldState, ESessionState newState)
 {
    LBRClient::onStateChange(oldState, newState);
    // (re)initialize sine parameters when entering Monitoring
@@ -128,7 +128,8 @@ void LBRJointSineOverlayClient::onStateChange(ESessionState oldState, ESessionSt
    {
       case MONITORING_READY:
       {
-         ROS_INFO_STREAM(robotState().getSampleTime());
+         sample_time = robotState().getSampleTime();
+         ROS_INFO_STREAM(sample_time);
          break;
       }
       default:
@@ -139,45 +140,48 @@ void LBRJointSineOverlayClient::onStateChange(ESessionState oldState, ESessionSt
 }
    
 //******************************************************************************
-void LBRJointSineOverlayClient::command()
+void KUKAJointControl::command()
 {
-   // calculate new offset
-   double curr_joint_pos[LBRState::NUMBER_OF_JOINTS];
-   double curr_velocity[LBRState::NUMBER_OF_JOINTS];
+  mtx.lock();
+  // calculate new offset
+  double curr_joint_pos[LBRState::NUMBER_OF_JOINTS];
+  double curr_velocity[LBRState::NUMBER_OF_JOINTS];
 
-   memcpy(curr_joint_pos, robotState().getMeasuredJointPosition(), LBRState::NUMBER_OF_JOINTS * sizeof(double));
-   
-   double joint_ext_torque[LBRState::NUMBER_OF_JOINTS];
-   memcpy(joint_ext_torque, robotState().getExternalTorque(), LBRState::NUMBER_OF_JOINTS * sizeof(double));
+  memcpy(curr_joint_pos, robotState().getMeasuredJointPosition(), LBRState::NUMBER_OF_JOINTS * sizeof(double));
 
-   double joint_measure_torque[LBRState::NUMBER_OF_JOINTS];
-   memcpy(joint_measure_torque, robotState().getMeasuredTorque(), LBRState::NUMBER_OF_JOINTS * sizeof(double));
+  double joint_ext_torque[LBRState::NUMBER_OF_JOINTS];
+  memcpy(joint_ext_torque, robotState().getExternalTorque(), LBRState::NUMBER_OF_JOINTS * sizeof(double));
 
-   double joint_commanded[LBRState::NUMBER_OF_JOINTS];
-   memcpy(joint_commanded, robotState().getCommandedJointPosition(), LBRState::NUMBER_OF_JOINTS * sizeof(double));
+  double joint_measure_torque[LBRState::NUMBER_OF_JOINTS];
+  memcpy(joint_measure_torque, robotState().getMeasuredTorque(), LBRState::NUMBER_OF_JOINTS * sizeof(double));
 
-   double joint_Ipo[LBRState::NUMBER_OF_JOINTS];
-   memcpy(joint_Ipo, robotState().getIpoJointPosition(), LBRState::NUMBER_OF_JOINTS * sizeof(double));   
+  double joint_commanded[LBRState::NUMBER_OF_JOINTS];
+  memcpy(joint_commanded, robotState().getCommandedJointPosition(), LBRState::NUMBER_OF_JOINTS * sizeof(double));
 
-   curr_time.data.sec  = (robotState().getTimestampSec());
-   curr_time.data.nsec = (robotState().getTimestampNanoSec());
+  double joint_Ipo[LBRState::NUMBER_OF_JOINTS];
+  memcpy(joint_Ipo, robotState().getIpoJointPosition(), LBRState::NUMBER_OF_JOINTS * sizeof(double));   
 
-   computeVelocity(curr_joint_pos, curr_velocity);
-   
-   // If the joint trajectory has been published, 
-   publishState(joint_ext_torque, joint_measure_torque, curr_joint_pos, joint_Ipo, joint_commanded, curr_velocity, curr_time);
+  curr_time.data.sec  = (robotState().getTimestampSec());
+  curr_time.data.nsec = (robotState().getTimestampNanoSec());
 
+  computeVelocity(curr_joint_pos, curr_velocity);
 
-   if (command_active == false) {
-      memcpy(_positions, robotState().getMeasuredJointPosition(), LBRState::NUMBER_OF_JOINTS * sizeof(double));
-   } 
+  // If the joint trajectory has been published, 
+  publishState(joint_ext_torque, joint_measure_torque, curr_joint_pos, joint_Ipo, joint_commanded, curr_velocity, curr_time);
 
-   // Set the position of the robot to desired.
-   robotCommand().setJointPosition(_positions);
+  // Set the position of the robot to desired.
+  if (!is_valid && is_command==false) {
+    memcpy(_positions, robotState().getCommandedJointPosition(), LBRState::NUMBER_OF_JOINTS * sizeof(double));
+  } else {
+    is_command = false;
+  }
+
+  robotCommand().setJointPosition(_positions);
+  mtx.unlock();
 }
 
 // Implementation of the computation of the velocity from finite difference.
-void LBRJointSineOverlayClient::computeVelocity(double curr_joint_pos[], double* vel_measured) {
+void KUKAJointControl::computeVelocity(double curr_joint_pos[], double* vel_measured) {
   /*for (int i=0; i < n_pos_history-1; i++) {
       temp_joint_pos.col(i) = temp_joint_pos.col(i+1);  
   }*/
@@ -196,7 +200,7 @@ void LBRJointSineOverlayClient::computeVelocity(double curr_joint_pos[], double*
 
 }
 
-void LBRJointSineOverlayClient::publishState(double jointExtTorque[], double jointTorque[], double jointState[], double jointStateIpo[], double jointStateCommanded[], double jointVelocity[], std_msgs::Time kuka_time)
+void KUKAJointControl::publishState(double jointExtTorque[], double jointTorque[], double jointState[], double jointStateIpo[], double jointStateCommanded[], double jointVelocity[], std_msgs::Time kuka_time)
 {
   memcpy(kukaExtTorque.torque.quantity.data(), jointExtTorque, 7*sizeof(double));
   kukaExtTorque.header.stamp = ros::Time::now();
@@ -230,28 +234,32 @@ void LBRJointSineOverlayClient::publishState(double jointExtTorque[], double joi
 
 
 // This function is to compute the torque input to the KUKA arm.
-void LBRJointSineOverlayClient::getKUKAJointCmd(const iiwa_msgs::JointPosition::ConstPtr& msg) {
-  _active_point = 1;
-  
-  /*if ((msg.header.stamp.toSec() - ros::Time::now.toSec()) {
+void KUKAJointControl::getKUKAJointCmd(const ros::MessageEvent<iiwa_msgs::JointPosition const>& event) { 
 
-  }*/
-  bool is_valid = true;
-  for (int i = 0;i < 7;i++) {
-    if (abs(kukaPosition.position.quantity[i] - msg->position.quantity[i]) > 0.1) {
+  is_command = true;
+  is_valid = true;
+
+  double time_diff = abs(event.getReceiptTime().toSec() - ros::Time::now().toSec());
+  const iiwa_msgs::JointPosition::ConstPtr& msg = event.getMessage();
+
+  for (int i = 0;i < LBRState::NUMBER_OF_JOINTS; i++) {
+    if (abs(kukaPosition.position.quantity[i] - msg->position.quantity[i]) > 0.2) {
       is_valid = false;
     }
 
   }
-  if (is_valid = true) {
+  // bool ans = boost::algorithm::any_of(abs(kukaPosition.position.quantity - msg->position.quantity), isNVALID);
+
+  if (is_valid==true && command_active==true && time_diff<0.1) {
     memcpy(_positions, msg->position.quantity.data(), 7*sizeof(double));
+    
   } else {
-    memcpy(_positions, kukaPosition.position.quantity.data(), LBRState::NUMBER_OF_JOINTS * sizeof(double));
+    memcpy(_positions, kukaPositionCommanded.position.quantity.data(), LBRState::NUMBER_OF_JOINTS * sizeof(double));
+    is_valid = false;
   }
   
 }
 
-
-void LBRJointSineOverlayClient::is_command_active(const std_msgs::Bool::ConstPtr& msg) {
+void KUKAJointControl::is_command_active(const std_msgs::Bool::ConstPtr& msg) {
   command_active = msg->data;
 }

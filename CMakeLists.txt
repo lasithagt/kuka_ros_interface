@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(kuka_torque)
+project(KUKAControlInterface)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 add_compile_options(-std=c++11)
@@ -156,35 +156,17 @@ target_link_libraries(kukaTorque
    ${FRI_LIBRARIES}
  )
 
-add_executable(kukaJointControl ./scripts/LBRJointSineOverlay/LBRJointSineOverlayClient.h ./scripts/LBRJointSineOverlay/LBRJointSineOverlayApp.cpp ./scripts/LBRJointSineOverlay/LBRJointSineOverlayClient.cpp model/kukaLWR_DHnew.cpp)
-add_dependencies(kukaJointControl iiwa_msgs_generate_messages_cpp)
+add_executable(KUKAJointControl ./scripts/KUKAJointControl/KUKAJointControlClient.h ./scripts/KUKAJointControl/KUKAJointControlApp.cpp ./scripts/KUKAJointControl/KUKAJointControlClient.cpp model/kukaLWR_DHnew.cpp)
+add_dependencies(KUKAJointControl iiwa_msgs_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(kukaJointControl
+target_link_libraries(KUKAJointControl
    ${catkin_LIBRARIES}
    orocos-kdl
    ${FRI_LIBRARIES}
  )
 
-add_executable(kukaCmd  ./scripts/LBRJointSineOverlay/send_data_cmd.cpp model/kukaLWR_DHnew.cpp)
-add_dependencies(kukaCmd iiwa_msgs_generate_messages_cpp)
 
-## Specify libraries to link a library or executable target against
-target_link_libraries(kukaCmd
-   ${catkin_LIBRARIES}
-   orocos-kdl
-   ${FRI_LIBRARIES}
-)
-
-add_executable(saveData  ./scripts/LBRJointSineOverlay/save_data.cpp model/kukaLWR_DHnew.cpp)
-add_dependencies(saveData iiwa_msgs_generate_messages_cpp)
-
-## Specify libraries to link a library or executable target against
-target_link_libraries(saveData
-   ${catkin_LIBRARIES}
-   orocos-kdl
-   ${FRI_LIBRARIES}
-)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the

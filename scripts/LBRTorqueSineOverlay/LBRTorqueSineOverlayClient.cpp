@@ -201,7 +201,7 @@ void LBRTorqueSineOverlayClient::command()
   jointPosDes[0] = 90.0* M_PI/180; jointPosDes[1] = -60.0* M_PI/180; jointPosDes[2] = 0.0* M_PI/180; jointPosDes[3] = 60.0* M_PI/180; jointPosDes[4] = 0.0* M_PI/180; jointPosDes[5] = -60.0* M_PI/180; jointPosDes[6] = 0.0* M_PI/180;
   
 
-  memcpy(curr_joint_pos, robotState().getMeasuredJointPosition(), LBRState::NUMBER_OF_JOINTS * sizeof(double));
+  memcpy(curr_joint_pos, robotState().getCommandedJointPosition(), LBRState::NUMBER_OF_JOINTS * sizeof(double));
   double _offset = 20.0* M_PI/180;
 
   // Measured torque = Commanded torque + External Torque;
@@ -243,7 +243,7 @@ void LBRTorqueSineOverlayClient::command()
   // Set superposed joint torques.
 
   robotCommand().setTorque(_torques);
-  // robotCommand().setJointPosition(curr_joint_pos);
+  robotCommand().setJointPosition(curr_joint_pos);
 
   }
 }
@@ -295,42 +295,6 @@ This function takes in a trajectory and sampled at a low frequency and resamples
 */
 void LBRTorqueSineOverlayClient::getKUKATorqueTrajCmd(const trajectory_msgs::JointTrajectory::ConstPtr& msg) {
 
-   // Toggle this to get traj command activated
-   
-   int n_len = msg->points.size();
-
-   ecl::Array<double> t(n_len);
-   ecl::Array<double> j1(n_len);
-   ecl::Array<double> j2(n_len);
-   ecl::Array<double> j3(n_len);
-   ecl::Array<double> j4(n_len);
-   ecl::Array<double> j5(n_len);
-   ecl::Array<double> j6(n_len);
-   ecl::Array<double> j7(n_len);
-
-   double original_freq = 0.02; // The rate at which controls are sent out.
-
-   if (n_len > 1) {
-     for (int i = 0; i < n_len; i++) {
-
-        t[i]  = original_freq * i;                       // msg->points.at(i).time_from_start.sec + (double)msg->points.at(i).time_from_start.nsec * pow(10,-9);
-        j1[i] = msg->points.at(i).positions.at(1);
-        j2[i] = msg->points.at(i).positions.at(2);
-        j3[i] = msg->points.at(i).positions.at(3);
-        j4[i] = msg->points.at(i).positions.at(4);
-        j5[i] = msg->points.at(i).positions.at(5);
-        j6[i] = msg->points.at(i).positions.at(6);
-        j7[i] = msg->points.at(i).positions.at(7);
-     }
-
-    sp_j1 = ecl::CubicSpline::ContinuousDerivatives(t,j1,0,0);
-    sp_j2 = ecl::CubicSpline::ContinuousDerivatives(t,j2,0,0);
-    sp_j3 = ecl::CubicSpline::ContinuousDerivatives(t,j3,0,0);
-    sp_j4 = ecl::CubicSpline::ContinuousDerivatives(t,j4,0,0);
-    sp_j5 = ecl::CubicSpline::ContinuousDerivatives(t,j5,0,0);
-    sp_j6 = ecl::CubicSpline::ContinuousDerivatives(t,j6,0,0);
-    sp_j7 = ecl::CubicSpline::ContinuousDerivatives(t,j7,0,0);
-    
-  }
+ 
 }
 

@@ -35,22 +35,16 @@ or otherwise, without the prior written consent of KUKA Roboter GmbH.
 
 
 */
-#ifndef _KUKA_FRI_LBR_JOINT_SINE_OVERLAY_CLIENT_H
-#define _KUKA_FRI_LBR_JOINT_SINE_OVERLAY_CLIENT_H
+#ifndef KUKAJOINTCONTROL_H
+#define KUKAJOINTCONTROL_H
 
 #include "friLBRClient.h"
 #include <ros/ros.h>
-#include <models.hpp>
 
-// #include <iiwa_ros.h>
 #include <iiwa_msgs/JointPosition.h>
 #include <iiwa_msgs/JointTorque.h>
 #include <iiwa_msgs/JointVelocity.h>
-#include <iiwa_msgs/JointPositionVelocity.h>
 
-#include <kdl/jntspaceinertiamatrix.hpp>
-#include <kdl/chaindynparam.hpp>
-#include <kdl/framevel.hpp>
 #include <kdl/jntarrayvel.hpp>
 
 #include <eigen3/Eigen/Dense>
@@ -65,13 +59,16 @@ or otherwise, without the prior written consent of KUKA Roboter GmbH.
 #include <ecl/errors.hpp>
 #include <ecl/concepts.hpp>
 #include <ecl/converters.hpp>
+#include <mutex>
+
+#include "low_pass.hpp"
 
 using namespace KUKA::FRI;
 
 /**
  * \brief Test client that can overlay interpolator joint positions with sine waves.
  */
-class LBRJointSineOverlayClient : public LBRClient
+class KUKAJointControl : public LBRClient
 {
    
 public:
@@ -84,12 +81,12 @@ public:
     * @param amplRad Sine amplitude in radians
     * @param filterCoeff Filter coefficient between 0 (filter off) and 1 (max filter)
     */
-   LBRJointSineOverlayClient(ros::NodeHandle &nh);
+   KUKAJointControl(ros::NodeHandle &nh);
    
    /** 
     * \brief Destructor.
     */
-   ~LBRJointSineOverlayClient();
+   ~KUKAJointControl();
    
    /**
     * \brief Callback for FRI state changes.
@@ -102,7 +99,7 @@ public:
    virtual void publishState(double jointExtTorque[], double jointTorque[], double jointState[], double jointIpoState[], double jointCommanded[], double jointVelocity[], std_msgs::Time kuka_time);
 
 
-   virtual void getKUKAJointCmd(const iiwa_msgs::JointPosition::ConstPtr& msg);
+   virtual void getKUKAJointCmd(const ros::MessageEvent<iiwa_msgs::JointPosition const>& msg);
    
    void computeVelocity(double curr_joint_pos[], double* vel_measured);
 
@@ -114,18 +111,10 @@ public:
       
 private:
    
-   int _jointMask;         //!< Bitmask encoding of overlay joints
-   double _freqHz;         //!< sine frequency (Hertz)
-   double _amplRad;        //!< sine amplitude (radians)
-   double _filterCoeff;    //!< filter coefficient
-   double _offset;         //!< offset for current interpolation step
-   double _phi;            //!< phase of sine wave
-   double _stepWidth;      //!< stepwidth for sine 
    double _positions[LBRState::NUMBER_OF_JOINTS]; //!< commanded superposed torques
-   bool _active_point;
-   bool _active_traj;
-   bool _active_last_comm;
+   bool is_valid;
    bool command_active;
+   bool is_command;
 
    ros::Subscriber sub_joint_position;
    ros::Subscriber sub_joint_position_traj;
@@ -142,9 +131,7 @@ private:
 
    std_msgs::Time curr_time;
 
-   double t_min;
-   double t_max;
-   double _start_time;
+   double sample_time;
    int n_pos_history;
 
    iiwa_msgs::JointTorque kukaTorque;
@@ -154,12 +141,16 @@ private:
    iiwa_msgs::JointPosition kukaPositionCommanded;
    iiwa_msgs::JointVelocity kukaVelocity;
 
+   DiscreteTimeLowPassFilter<double>* lp_filter;
+
 
    Eigen::Matrix<double, 7, 5> temp_joint_pos;
    Eigen::Matrix<double, 7, 4> temp_joint_vel;
    
    Eigen::Matrix<double,4,1> filter_weights;
    Eigen::VectorXd curr_velocity;
+
+   std::mutex mtx;
 
 };
 

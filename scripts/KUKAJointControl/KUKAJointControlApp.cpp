@@ -38,7 +38,7 @@ or otherwise, without the prior written consent of KUKA Roboter GmbH.
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h> // strstr
-#include "LBRJointSineOverlayClient.h"
+#include "KUKAJointControlClient.h"
 #include "friUdpConnection.h"
 #include "friClientApplication.h"
 
@@ -87,12 +87,12 @@ int main (int argc, char** argv)
    /**************************************************************************/
    
 
-   const std::string node_name = "KukaJoint";
+   const std::string node_name = "KUKAJointControl_node";
    ros::init(argc, argv, node_name);
    ros::NodeHandle nh("~");
    
    // create new sine overlay client
-   LBRJointSineOverlayClient client(nh);
+   KUKAJointControl client(nh);
 
    /***************************************************************************/
    /*                                                                         */

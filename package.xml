@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package>
-  <name>kuka_torque</name>
+  <name>KUKAControlInterface</name>
   <version>0.0.0</version>
   <description>The kuka_torque package</description>
 
