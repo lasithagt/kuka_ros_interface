@@ -38,17 +38,15 @@ or otherwise, without the prior written consent of KUKA Roboter GmbH.
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h> // strstr
-#include "LBRTorqueSineOverlayClient.h"
+#include "LBRWrenchSineOverlayClient.h"
 #include "friUdpConnection.h"
 #include "friClientApplication.h"
-#include <ros/ros.h>
 
 using namespace KUKA::FRI;
 
 
 #define DEFAULT_PORTID 30200
-#define DEFAULT_JOINTMASK 0xFF
-#define DEFAULT_FREQUENCY 0.10
+#define DEFAULT_FREQUENCY 0.25
 #define DEFAULT_AMPLITUDE 5.0
 
 
@@ -61,37 +59,35 @@ int main (int argc, char** argv)
 	   if ( strstr (argv[1],"help") != NULL)
 	   {
 	      printf(
-	            "\nKUKA LBR torque sine overlay test application\n\n"
+	            "\nKUKA LBR wrench sine overlay test application\n\n"
 	            "\tCommand line arguments:\n"
 	            "\t1) remote hostname (optional)\n"
 	            "\t2) port ID (optional)\n"
-	            "\t3) bit mask encoding of joints to be overlaid (optional)\n"
-	            "\t4) sine frequency in Hertz (optional)\n"
-	            "\t5) sine amplitude in Nm (optional)\n"
+	            "\t3) sine frequency in Hertz (for Fx) (optional)\n"
+	            "\t4) sine amplitude in radians (for Fx) (optional)\n"
+	            "\t5) sine frequency in Hertz (for Fy) (optional)\n"
+	            "\t6) sine amplitude in radians (for Fy) (optional)\n"
 	      );
 	      return 1;
 	   }
    }
    char* hostname = (argc >= 2) ? argv[1] : const_cast<char*>("192.170.10.2");
    int port = (argc >= 3) ? atoi(argv[2]) : DEFAULT_PORTID;
-   unsigned int jointMask = (argc >= 4) ? (unsigned int)atoi(argv[3]) : DEFAULT_JOINTMASK;
    double frequency = (argc >= 5) ? atof(argv[4]) : DEFAULT_FREQUENCY;
    double amplitude = (argc >= 6) ? atof(argv[5]) : DEFAULT_AMPLITUDE;
-
    /***************************************************************************/
    /*                                                                         */
    /*   Place user Client Code here                                           */
    /*                                                                         */
    /**************************************************************************/
-   
-   const std::string node_name = "KukaTorque";
+   const std::string node_name = "KUKAWrenchControl_node";
    ros::init(argc, argv, node_name);
    ros::NodeHandle nh("~");
    
 
 
    // create new sine overlay client
-   LBRTorqueSineOverlayClient client(jointMask, frequency, amplitude, nh);
+   LBRWrenchSineOverlayClient client(nh);
 
    /***************************************************************************/
    /*                                                                         */
@@ -121,8 +117,6 @@ int main (int argc, char** argv)
    ros::AsyncSpinner spinner(4); // Use 4 threads
    spinner.start();
    
-
-
    bool success = true;
 
    while (success & !ros::isShuttingDown())

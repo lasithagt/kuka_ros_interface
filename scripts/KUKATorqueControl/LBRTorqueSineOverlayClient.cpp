@@ -56,20 +56,19 @@ or otherwise, without the prior written consent of KUKA Roboter GmbH.
 #endif
 
 //******************************************************************************
-LBRTorqueSineOverlayClient::LBRTorqueSineOverlayClient(unsigned int jointMask, 
-      double freqHz, double torqueAmplitude, ros::NodeHandle &nh) 
-   :_jointMask(jointMask)
-   , _freqHz(freqHz)
-   , _torqueAmpl(torqueAmplitude)
-   , _phi(0.0)
-   , _stepWidth(0.0)
-   , _sampleTime(0.0)
+LBRTorqueSineOverlayClient::LBRTorqueSineOverlayClient(ros::NodeHandle &nh) 
+   :command_active(false)
+   ,is_valid(false)
+   ,sample_time(0.0)
+   ,is_command(false)
+   ,joint_cmd_active(false)
 {
-  printf("LBRTorqueSineOverlayClient initialized:\n");
+  printf("KUKA LBR initilized ...\n");
 
   // Subscribers
-  sub_command_torque = nh.subscribe("/kuka/command/command_torque", 1, &LBRTorqueSineOverlayClient::getKUKATorque, this);
-  // sub_joint_position      = nh.subscribe("/user/KUKACmdPosition", 1, &LBRTorqueSineOverlayClient::getKUKATorqueCmd, this);
+  sub_command_torque = nh.subscribe("/kuka/command/command_torque", 1, &LBRTorqueSineOverlayClient::getKUKATorqueCmd, this);
+  sub_command_joint  = nh.subscribe("/kuka/command/command_position", 1, &LBRTorqueSineOverlayClient::getKUKAJointCmd, this);
+  sub_command_active = nh.subscribe("/kuka/command/active", 1, &LBRTorqueSineOverlayClient::is_command_active, this);
 
   // Publishers
   pub_torque       = nh.advertise<iiwa_msgs::JointTorque>("/kuka/state/KUKAActualTorque", 1); 
@@ -80,32 +79,40 @@ LBRTorqueSineOverlayClient::LBRTorqueSineOverlayClient(unsigned int jointMask,
   pub_kuka_time    = nh.advertise<std_msgs::Time>("/kuka/state/KUKATime", 1);
   
   // Set current time to zero
-  // curr_time = ros::Time();
-  kuka_time = 0.0;
-
-  // curr_velocity.resize(7);
-  filter_weights.col(0) << 0.25/0.001, 0.25/0.001, 0.25/0.001, 0.25/0.001;
   
-  // Number of points to the moving average
-  n_position_history = 5;
-
-  temp_joint_vel = Eigen::MatrixXd::Zero(7, n_position_history-1);
-  init_velocity_flag = true;
-
   kukaTorque.torque.quantity.resize(LBRState::NUMBER_OF_JOINTS);
   kukaExtTorque.torque.quantity.resize(LBRState::NUMBER_OF_JOINTS);
   kukaPosition.position.quantity.resize(LBRState::NUMBER_OF_JOINTS);
   kukaPositionCommanded.position.quantity.resize(LBRState::NUMBER_OF_JOINTS);
   kukaVelocity.velocity.quantity.resize(LBRState::NUMBER_OF_JOINTS);
 
+
+  // initialize the toruque
   for(int i = 0; i< LBRState::NUMBER_OF_JOINTS; i++){ _torques[i] = 0.0;}
+
+  // compute the velocity
+  curr_velocity.resize(7);
+  filter_weights.col(0) << 0.25/0.001, 0.25/0.001, 0.25/0.001, 0.25/0.001;
+
+  // Number of points to the moving average
+  n_position_history = 5;
+
+  for (int i=0; i < n_position_history; i++) {
+      temp_joint_pos.col(i) << 0,-1.21026  ,0,-1.67354, 0,-0.463276, 0;    
+  }
+
+  temp_joint_vel = Eigen::MatrixXd::Zero(7, n_position_history-1);
+
+  // Initialize filters.
+  const double cutoff_hz = 40;
+  lp_filter = new DiscreteTimeLowPassFilter<double>(cutoff_hz, sample_time);
 
 }
 
 //******************************************************************************
 LBRTorqueSineOverlayClient::~LBRTorqueSineOverlayClient()
 {
-
+    delete(lp_filter);
 }
 
 
@@ -120,9 +127,6 @@ void LBRTorqueSineOverlayClient::onStateChange(ESessionState oldState, ESessionS
       case MONITORING_READY:
       {
          for(int i = 0; i< LBRState::NUMBER_OF_JOINTS; i++){ _torques[i] = 0.0;}
-         _phi = 0.0;
-         _sampleTime = robotState().getSampleTime();
-         _stepWidth = 2 * M_PI * _freqHz * robotState().getSampleTime();
          break;
       }
       default:
@@ -158,30 +162,33 @@ void LBRTorqueSineOverlayClient::monitor() {
 
 void LBRTorqueSineOverlayClient::publishState(double jointExtTorque[], double jointTorque[], double jointState[], double jointStateCommanded[], double jointVelocity[], std_msgs::Time kuka_time)
 {
-  /*iiwa_msgs::JointTorque kukaTorque;
-  iiwa_msgs::JointTorque kukaExtTorque;
-  iiwa_msgs::JointPosition kukaPosition;
-  iiwa_msgs::JointPosition kukaPositionCommanded;
-  iiwa_msgs::JointVelocity kukaVelocity;*/
 
-
-  // kukaExtTorque.torque.time_from_start = ros::Time::now();
   memcpy(kukaExtTorque.torque.quantity.data(), jointExtTorque, 7*sizeof(double));
+  kukaExtTorque.header.stamp = ros::Time::now();
+
   memcpy(kukaTorque.torque.quantity.data(), jointTorque, 7*sizeof(double));
+  kukaTorque.header.stamp = ros::Time::now();
+
   memcpy(kukaPosition.position.quantity.data(), jointState, 7*sizeof(double));
+  kukaPosition.header.stamp = ros::Time::now();
+
+
   memcpy(kukaPositionCommanded.position.quantity.data(), jointStateCommanded, 7*sizeof(double));
+  kukaPositionCommanded.header.stamp = ros::Time::now();
+
   memcpy(kukaVelocity.velocity.quantity.data(), jointVelocity, 7*sizeof(double));
+  kukaVelocity.header.stamp = ros::Time::now();
+
   curr_time.data.sec = kuka_time.data.sec;
   curr_time.data.nsec = kuka_time.data.nsec;
 
   pub_torque.publish(kukaTorque);
   pub_ext_torque.publish(kukaExtTorque);
   pub_position.publish(kukaPosition);
+  // pub_position_Ipo.publish(kukaPositionIpo);
   pub_position_com.publish(kukaPositionCommanded);
   joint_vel_pub_.publish(kukaVelocity);
   pub_kuka_time.publish(curr_time);
-
-  // Subscribers
 
 }
 //******************************************************************************
@@ -189,63 +196,63 @@ void LBRTorqueSineOverlayClient::command()
 {
   // In command(), the joint values have to be sent. Which is done by calling
   // the base method.
-  LBRClient::command();
-
-  
+  mtx.lock();
 
   double curr_joint_pos[LBRState::NUMBER_OF_JOINTS];
+  double joint_pos_desired[LBRState::NUMBER_OF_JOINTS];
   double curr_velocity[LBRState::NUMBER_OF_JOINTS];
-  std_msgs::Time curr_time;
 
-  double jointPosDes[LBRState::NUMBER_OF_JOINTS];
-  jointPosDes[0] = 90.0* M_PI/180; jointPosDes[1] = -60.0* M_PI/180; jointPosDes[2] = 0.0* M_PI/180; jointPosDes[3] = 60.0* M_PI/180; jointPosDes[4] = 0.0* M_PI/180; jointPosDes[5] = -60.0* M_PI/180; jointPosDes[6] = 0.0* M_PI/180;
-  
 
-  memcpy(curr_joint_pos, robotState().getCommandedJointPosition(), LBRState::NUMBER_OF_JOINTS * sizeof(double));
-  double _offset = 20.0* M_PI/180;
+
+  // Get the current joint positions
+  memcpy(curr_joint_pos, robotState().getMeasuredJointPosition(), LBRState::NUMBER_OF_JOINTS * sizeof(double));
 
   // Measured torque = Commanded torque + External Torque;
   double joint_measure_torque[LBRState::NUMBER_OF_JOINTS];
   memcpy(joint_measure_torque, robotState().getMeasuredTorque(), LBRState::NUMBER_OF_JOINTS * sizeof(double));
 
-  // Commanded torque
+  // Get the commanded torque
   double joint_commanded[LBRState::NUMBER_OF_JOINTS];
   memcpy(joint_commanded, robotState().getCommandedTorque(), LBRState::NUMBER_OF_JOINTS * sizeof(double));
 
-  // External toruqe on joints
+  // Get the external toruqe on joints
   double joint_ext_torque[LBRState::NUMBER_OF_JOINTS];
   memcpy(joint_ext_torque, robotState().getExternalTorque(), LBRState::NUMBER_OF_JOINTS * sizeof(double));
 
   curr_time.data.sec  = (robotState().getTimestampSec());
   curr_time.data.nsec = (robotState().getTimestampNanoSec());
   
-  // get KUKA time
-  // kuka_time = (double)robotState().getTimestampSec() + ((double)robotState().getTimestampNanoSec())/(1e9);
-  
+  // compute the velocity
   computeVelocity(curr_joint_pos, curr_velocity);
 
+  // publisht the states 
   publishState(joint_ext_torque, joint_measure_torque, curr_joint_pos, joint_commanded, curr_velocity, curr_time);
 
-  // Check for correct ClientCommandMode.
+  // Check for corre
   robotCommand().setJointPosition(curr_joint_pos);
-  if (robotState().getClientCommandMode() == TORQUE)
-  { 
+  if (robotState().getClientCommandMode() == TORQUE) { 
      
+    // _torques[4]       = 30*(0.01 - curr_joint_pos[4]); // offset;
+ 
     for (int i=0; i<LBRState::NUMBER_OF_JOINTS; i++)
     {
-      if (_jointMask & (1<<i))
-      { 
-          // _torques[i] = 200*(jointPosDes[i] - curr_joint_pos[i]); // offset;
-          curr_joint_pos[i] = curr_joint_pos[i]; // _offset;
-      }
+        // _torques[i]       = 10*(-joint_pos_desired[i] + curr_joint_pos[i]); // offset;
+      
     }
 
-  // Set superposed joint torques.
+    // Set superposed joint torques
+    if (joint_cmd_active) {
+      ROS_INFO_STREAM(_joints[6]);
 
-  robotCommand().setTorque(_torques);
-  robotCommand().setJointPosition(curr_joint_pos);
-
+      robotCommand().setJointPosition(_joints);
+    } else {
+      // robotCommand().setJointPosition(curr_joint_pos);
+    }
+  
+    robotCommand().setTorque(_torques);
   }
+  
+  mtx.unlock();
 }
 
 /* 
@@ -253,32 +260,59 @@ Implementation of the computation of the velocity from finite difference and a w
 */
 void LBRTorqueSineOverlayClient::computeVelocity(double curr_joint_pos[], double* vel_measured) {
 
-  if (init_velocity_flag) {
-
-    for (int i=0; i < n_position_history; i++) {
-        temp_joint_pos.col(i) << curr_joint_pos[0], curr_joint_pos[1], curr_joint_pos[2], curr_joint_pos[3], curr_joint_pos[4], curr_joint_pos[5], curr_joint_pos[6];    
-    } 
-
-    init_velocity_flag = false;
-  }
-
+  /*for (int i=0; i < n_pos_history-1; i++) {
+      temp_joint_pos.col(i) = temp_joint_pos.col(i+1);  
+  }*/
   // Shift the block to left
   temp_joint_pos.block(0,0,7,n_position_history-1) = temp_joint_pos.block(0,1,7,n_position_history-1).eval();
 
   // Append the current joint position to the end.
   temp_joint_pos.col(n_position_history-1) << curr_joint_pos[0], curr_joint_pos[1], curr_joint_pos[2], curr_joint_pos[3], curr_joint_pos[4], curr_joint_pos[5], curr_joint_pos[6]; 
-  
+
   // Compute the velocity
   temp_joint_vel = temp_joint_pos.block(0,1,7,n_position_history-1) - temp_joint_pos.block(0,0,7,n_position_history-1);   
-  
+
   // Filter the weights
   curr_velocity = temp_joint_vel * filter_weights;
   memcpy(vel_measured, curr_velocity.data(), 7*sizeof(curr_velocity.data()));
 
 }
 
+// This function is to compute the joint position input to the KUKA arm.
+void LBRTorqueSineOverlayClient::getKUKAJointCmd(const ros::MessageEvent<iiwa_msgs::JointPosition const>& event) {
+
+  is_command = true;
+  is_valid = true;
+  joint_cmd_active = true;
+
+  double time_diff = abs(event.getReceiptTime().toSec() - ros::Time::now().toSec());
+  const iiwa_msgs::JointPosition::ConstPtr& msg = event.getMessage();
+
+  _joints[0] = msg->position.quantity.at(0);
+  _joints[1] = msg->position.quantity.at(1);
+  _joints[2] = msg->position.quantity.at(2);
+  _joints[3] = msg->position.quantity.at(3);
+  _joints[4] = msg->position.quantity.at(4);
+  _joints[5] = msg->position.quantity.at(5);
+  _joints[6] = msg->position.quantity.at(6);
+
+  for (int i = 0;i < LBRState::NUMBER_OF_JOINTS; i++) {
+    // if (abs(kukaPosition.position.quantity[i] - msg->position.quantity[i]) > 0.2) {
+    //   is_valid = false;
+    // }
+
+  }
+}
+
 // This function is to compute the torque input to the KUKA arm.
-void LBRTorqueSineOverlayClient::getKUKATorque(const iiwa_msgs::JointTorque::ConstPtr& msg) {
+void LBRTorqueSineOverlayClient::getKUKATorqueCmd(const ros::MessageEvent<iiwa_msgs::JointTorque const>& event) {
+
+  is_command = true;
+  is_valid = true;
+
+  double time_diff = abs(event.getReceiptTime().toSec() - ros::Time::now().toSec());
+  const iiwa_msgs::JointTorque::ConstPtr& msg = event.getMessage();
+
   _torques[0] = msg->torque.quantity.at(0);
   _torques[1] = msg->torque.quantity.at(1);
   _torques[2] = msg->torque.quantity.at(2);
@@ -287,14 +321,29 @@ void LBRTorqueSineOverlayClient::getKUKATorque(const iiwa_msgs::JointTorque::Con
   _torques[5] = msg->torque.quantity.at(5);
   _torques[6] = msg->torque.quantity.at(6);
 
+  for (int i = 0;i < LBRState::NUMBER_OF_JOINTS; i++) {
+    // if (abs(kukaPosition.position.quantity[i] - msg->position.quantity[i]) > 0.2) {
+    //   is_valid = false;
+    // }
+
+  }
+  // bool ans = boost::algorithm::any_of(abs(kukaPosition.position.quantity - msg->position.quantity), isNVALID);
+
+  // if (is_valid==true && command_active==true && time_diff<0.1) {
+  //   memcpy(_positions, msg->torque.quantity.data(), 7*sizeof(double));
+    
+  // } else {
+  //   memcpy(_positions, kukaPositionCommanded.position.quantity.data(), LBRState::NUMBER_OF_JOINTS * sizeof(double));
+  //   is_valid = false;
+  // }
+
 }
 
 /* This function is to compute the torque input to the KUKA arm. 
 This function takes in a trajectory and sampled at a low frequency and resamples it at 1000 Hz
 
 */
-void LBRTorqueSineOverlayClient::getKUKATorqueTrajCmd(const trajectory_msgs::JointTrajectory::ConstPtr& msg) {
-
- 
+void LBRTorqueSineOverlayClient::is_command_active(const std_msgs::Bool::ConstPtr& msg) {
+  command_active = msg->data;
 }
 

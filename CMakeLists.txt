@@ -8,7 +8,6 @@ add_compile_options(-std=c++11)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
-  # iiwa_ros
   iiwa_msgs
   roscpp
   trajectory_msgs
@@ -146,11 +145,11 @@ FIND_LIBRARY(FRI_LIBRARIES libFRIClient.a ./lib)
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 
-add_executable(kukaTorque ./scripts/LBRTorqueSineOverlay/LBRTorqueSineOverlayClient.h ./scripts/LBRTorqueSineOverlay/LBRTorqueSineOverlayApp.cpp ./scripts/LBRTorqueSineOverlay/LBRTorqueSineOverlayClient.cpp model/kukaLWR_DHnew.cpp)
-add_dependencies(kukaTorque iiwa_msgs_generate_messages_cpp)
+add_executable(KUKATorqueControl ./scripts/KUKATorqueControl/LBRTorqueSineOverlayClient.h ./scripts/KUKATorqueControl/LBRTorqueSineOverlayApp.cpp ./scripts/KUKATorqueControl/LBRTorqueSineOverlayClient.cpp model/kukaLWR_DHnew.cpp)
+add_dependencies(KUKATorqueControl iiwa_msgs_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(kukaTorque
+target_link_libraries(KUKATorqueControl
    ${catkin_LIBRARIES}
    orocos-kdl
    ${FRI_LIBRARIES}
@@ -161,6 +160,16 @@ add_dependencies(KUKAJointControl iiwa_msgs_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(KUKAJointControl
+   ${catkin_LIBRARIES}
+   orocos-kdl
+   ${FRI_LIBRARIES}
+ )
+
+
+add_executable(KUKAWrenchControl ./scripts/KUKAWrenchControl/LBRWrenchSineOverlayClient.h ./scripts/KUKAWrenchControl/LBRWrenchSineOverlayApp.cpp ./scripts/KUKAWrenchControl/LBRWrenchSineOverlayClient.cpp)
+add_dependencies(KUKAWrenchControl iiwa_msgs_generate_messages_cpp)
+
+target_link_libraries(KUKAWrenchControl
    ${catkin_LIBRARIES}
    orocos-kdl
    ${FRI_LIBRARIES}

@@ -70,48 +70,48 @@ KUKAJointControl::KUKAJointControl(ros::NodeHandle &nh)
    ,is_valid(false)
    ,sample_time(0.0)
    ,is_command(false)
-{
-   printf("KUKA LBR initilized ...\n");
+  {
+     printf("KUKA LBR initilized ...\n");
 
 
-  // Subscribers
-  sub_joint_position = nh.subscribe("/kuka/command/command_position", 1, &KUKAJointControl::getKUKAJointCmd, this);
-  sub_command_active = nh.subscribe("/kuka/command/active", 1, &KUKAJointControl::is_command_active, this);
+    // Subscribers
+    sub_joint_position = nh.subscribe("/kuka/command/command_position", 1, &KUKAJointControl::getKUKAJointCmd, this);
+    sub_command_active = nh.subscribe("/kuka/command/active", 1, &KUKAJointControl::is_command_active, this);
 
-  // Publishers
-  pub_torque       = nh.advertise<iiwa_msgs::JointTorque>("/kuka/state/KUKAActualTorque", 1); 
-  pub_ext_torque   = nh.advertise<iiwa_msgs::JointTorque>("/kuka/state/KUKAExtTorque", 1); 
-  pub_position     = nh.advertise<iiwa_msgs::JointPosition>("/kuka/state/KUKAJointPosition", 1); 
-  pub_position_com = nh.advertise<iiwa_msgs::JointPosition>("/kuka/state/KUKAJointPositionCommand", 1); 
-  pub_position_Ipo = nh.advertise<iiwa_msgs::JointPosition>("/kuka/state/KUKAJointPositionIpo", 1);
-  joint_vel_pub_   = nh.advertise<iiwa_msgs::JointVelocity>("/kuka/state/KUKAJointVelocity", 1);   
-  pub_kuka_time    = nh.advertise<std_msgs::Time>("/kuka/state/KUKATime", 1);
+    // Publishers
+    pub_torque       = nh.advertise<iiwa_msgs::JointTorque>("/kuka/state/KUKAActualTorque", 1); 
+    pub_ext_torque   = nh.advertise<iiwa_msgs::JointTorque>("/kuka/state/KUKAExtTorque", 1); 
+    pub_position     = nh.advertise<iiwa_msgs::JointPosition>("/kuka/state/KUKAJointPosition", 1); 
+    pub_position_com = nh.advertise<iiwa_msgs::JointPosition>("/kuka/state/KUKAJointPositionCommand", 1); 
+    pub_position_Ipo = nh.advertise<iiwa_msgs::JointPosition>("/kuka/state/KUKAJointPositionIpo", 1);
+    joint_vel_pub_   = nh.advertise<iiwa_msgs::JointVelocity>("/kuka/state/KUKAJointVelocity", 1);   
+    pub_kuka_time    = nh.advertise<std_msgs::Time>("/kuka/state/KUKATime", 1);
 
-  // Initialization
-  kukaTorque.torque.quantity.resize(LBRState::NUMBER_OF_JOINTS);
-  kukaExtTorque.torque.quantity.resize(LBRState::NUMBER_OF_JOINTS);
-  kukaPosition.position.quantity.resize(LBRState::NUMBER_OF_JOINTS);
-  kukaPositionCommanded.position.quantity.resize(LBRState::NUMBER_OF_JOINTS);
-  kukaPositionIpo.position.quantity.resize(LBRState::NUMBER_OF_JOINTS);
-  kukaVelocity.velocity.quantity.resize(LBRState::NUMBER_OF_JOINTS);
+    // Initialization
+    kukaTorque.torque.quantity.resize(LBRState::NUMBER_OF_JOINTS);
+    kukaExtTorque.torque.quantity.resize(LBRState::NUMBER_OF_JOINTS);
+    kukaPosition.position.quantity.resize(LBRState::NUMBER_OF_JOINTS);
+    kukaPositionCommanded.position.quantity.resize(LBRState::NUMBER_OF_JOINTS);
+    kukaPositionIpo.position.quantity.resize(LBRState::NUMBER_OF_JOINTS);
+    kukaVelocity.velocity.quantity.resize(LBRState::NUMBER_OF_JOINTS);
 
-  // Set current time to zero
+    // Set current time to zero
 
-  curr_velocity.resize(7);
-  filter_weights.col(0) << 0.25/0.001, 0.25/0.001, 0.25/0.001, 0.25/0.001;
-  n_pos_history = 5; // This is user defined.
+    curr_velocity.resize(7);
+    filter_weights.col(0) << 0.25/0.001, 0.25/0.001, 0.25/0.001, 0.25/0.001;
+    n_pos_history = 5; // This is user defined.
 
-  for (int i=0; i < n_pos_history; i++) {
-      temp_joint_pos.col(i) << 0,-1.21026  ,0,-1.67354, 0,-0.463276, 0;    
-  }
+    for (int i=0; i < n_pos_history; i++) {
+        temp_joint_pos.col(i) << 0,-1.21026  ,0,-1.67354, 0,-0.463276, 0;    
+    }
 
-  temp_joint_vel = Eigen::MatrixXd::Zero(7, n_pos_history-1);
+    temp_joint_vel = Eigen::MatrixXd::Zero(7, n_pos_history-1);
 
-  // Initialize filters.
-  const double cutoff_hz = 40;
-  lp_filter = new DiscreteTimeLowPassFilter<double>(cutoff_hz, sample_time);
+    // Initialize filters.
+    const double cutoff_hz = 40;
+    lp_filter = new DiscreteTimeLowPassFilter<double>(cutoff_hz, sample_time);
 
-  }
+}
   
 //******************************************************************************
 KUKAJointControl::~KUKAJointControl()
@@ -180,7 +180,7 @@ void KUKAJointControl::command()
   mtx.unlock();
 }
 
-// Implementation of the computation of the velocity from finite difference.
+// Implementation of the computation of the velocity from finite difference. Use a low pass filter.
 void KUKAJointControl::computeVelocity(double curr_joint_pos[], double* vel_measured) {
   /*for (int i=0; i < n_pos_history-1; i++) {
       temp_joint_pos.col(i) = temp_joint_pos.col(i+1);  

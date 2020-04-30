@@ -35,38 +35,39 @@ or otherwise, without the prior written consent of KUKA Roboter GmbH.
 
 
 */
-#ifndef _KUKA_FRI_LBR_TORQUE_SINE_OVERLAY_CLIENT_H
-#define _KUKA_FRI_LBR_TORQUE_SINE_OVERLAY_CLIENT_H
+#ifndef _KUKA_FRI_LBR_WRENCH_SINE_OVERLAY_CLIENT_H
+#define _KUKA_FRI_LBR_WRENCH_SINE_OVERLAY_CLIENT_H
+
 
 #include <iiwa_msgs/JointPosition.h>
 #include <iiwa_msgs/JointTorque.h>
 #include <iiwa_msgs/JointVelocity.h>
+#include <iiwa_msgs/Wrench.h>
 #include <iiwa_msgs/JointPositionVelocity.h>
 
 #include "friLBRClient.h"
 #include <ros/ros.h>
 #include <models.hpp>
 
-//#include <Eigen/StdVector>
 #include <eigen3/Eigen/Dense>
 #include <trajectory_msgs/JointTrajectory.h>
 #include <std_msgs/Float32.h>
 #include <std_msgs/Time.h>
+#include <std_msgs/Bool.h>
 
-#include <ecl/geometry.hpp>
-#include <ecl/containers.hpp>
-#include <ecl/exceptions.hpp>
-#include <ecl/errors.hpp>
-#include <ecl/concepts.hpp>
-#include <ecl/converters.hpp>
 
+#include <mutex>
+#define WRENCH_STATE 6
+
+
+#include "low_pass.hpp"
 
 using namespace KUKA::FRI;
 
 /**
- * \brief Test client that superposes joint torques with sine waves.
+ * \brief Test client that can overlay interpolator joint positions with sine waves.
  */
-class LBRTorqueSineOverlayClient : public LBRClient
+class LBRWrenchSineOverlayClient : public LBRClient
 {
    
 public:
@@ -74,17 +75,17 @@ public:
    /**
     * \brief Constructor.
     * 
-    * @param jointMask Bit mask that encodes the joint indices to be overlaid by sine waves
-    * @param freqHz Sine frequency in Hertz
-    * @param torqueAmplitude Sine amplitude in Nm
+    * @param freqHzX Sine frequency in hertz of force in X-direction
+    * @param freqHzY Sine frequency in hertz of force in Y-direction
+    * @param amplRadX Sine amplitude in radians of force in X-direction
+    * @param amplRadY Sine amplitude in radians of force in Y-direction
     */
-   LBRTorqueSineOverlayClient(unsigned int jointMask, double freqHz, 
-         double torqueAmplitude, ros::NodeHandle &nh);
+   LBRWrenchSineOverlayClient(ros::NodeHandle &nh);
    
    /** 
     * \brief Destructor.
     */
-   ~LBRTorqueSineOverlayClient();
+   ~LBRWrenchSineOverlayClient();
    
    /**
     * \brief Callback for FRI state changes.
@@ -104,28 +105,34 @@ public:
     */
    virtual void command();
 
-   virtual void monitor();
-
    virtual void publishState(double jointExtTorque[], double jointTorque[], double jointState[], double jointStateCommanded[], double jointVelocity[], std_msgs::Time t);
 
-   virtual void getKUKATorque(const iiwa_msgs::JointTorque::ConstPtr& msg);
+   virtual void getKUKAWrenchCmd(const ros::MessageEvent<iiwa_msgs::Wrench const>& event);
 
-   virtual void getKUKATorqueTrajCmd(const trajectory_msgs::JointTrajectory::ConstPtr& msg);
+   virtual void getKUKAJointCmd(const ros::MessageEvent<iiwa_msgs::JointPosition const>& event);
+
+   void is_command_active(const std_msgs::Bool::ConstPtr& msg); 
 
    void computeVelocity(double curr_joint_pos[], double* vel_measured);
       
 private:
-      
-   int _jointMask;         //!< bit mask encoding of overlay joints
-   double _freqHz;         //!< sine frequency (Hertz)
-   double _torqueAmpl;     //!< sine amplitude (Nm)
-   double _phi;            //!< phase of sine wave
-   double _stepWidth;      //!< stepwidth for sine 
-   double _torques[LBRState::NUMBER_OF_JOINTS]; //!< commanded superposed torques
-   double _sampleTime;
+   double _wrench[WRENCH_STATE]; //!< commanded superposed torques
+   double _joints[LBRState::NUMBER_OF_JOINTS];
+   double sample_time;
 
-   ros::Subscriber sub_command_torque;
-   // ros::Subscriber n_traj_points_sub;
+   bool is_valid;
+   bool command_active;
+   bool is_valid_wrench;
+   bool is_command_wrench;
+   bool is_command;
+   bool joint_cmd_active;
+
+
+   ros::Subscriber sub_command_wrench;
+   ros::Subscriber sub_command_joint;
+   ros::Subscriber sub_joint_position;
+   // ros::Subscriber sub_joint_position_traj;
+   ros::Subscriber sub_command_active;
 
    ros::Publisher pub_position;
    ros::Publisher pub_position_com;
@@ -134,9 +141,6 @@ private:
    ros::Publisher joint_vel_pub_;
    ros::Publisher pub_kuka_time;
 
-   double _start_time;
-   double n_traj_points;
-   double kuka_time;
    int n_position_history;
 
    std_msgs::Time curr_time;
@@ -147,14 +151,8 @@ private:
    iiwa_msgs::JointPosition kukaPositionCommanded;
    iiwa_msgs::JointVelocity kukaVelocity;
 
+   DiscreteTimeLowPassFilter<double>* lp_filter;
 
-   ecl::CubicSpline sp_j1;
-   ecl::CubicSpline sp_j2;
-   ecl::CubicSpline sp_j3;
-   ecl::CubicSpline sp_j4;
-   ecl::CubicSpline sp_j5;
-   ecl::CubicSpline sp_j6;
-   ecl::CubicSpline sp_j7;
 
    Eigen::Matrix<double, 7, 5> temp_joint_pos;
    Eigen::Matrix<double, 7, 4> temp_joint_vel;
@@ -162,7 +160,8 @@ private:
    Eigen::Matrix<double,4,1> filter_weights;
    Eigen::Matrix<double,7,1> curr_velocity;
 
-   bool init_velocity_flag;
+   std::mutex mtx;
+   
 };
 
-#endif // _KUKA_FRI_LBR_TORQUE_SINE_OVERLAY_CLIENT_H
+#endif // _KUKA_FRI_LBR_WRENCH_SINE_OVERLAY_CLIENT_H
