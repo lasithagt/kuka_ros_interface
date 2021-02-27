@@ -290,12 +290,12 @@ void LBRWrenchSineOverlayClient::getKUKAWrenchCmd(const ros::MessageEvent<iiwa_m
   // }
 
   if (is_valid_wrench==true && command_active==true && time_diff<0.1) {
-   memcpy(_wrench, msg->wrench.quantity.data(), 6*sizeof(double));
+   // memcpy(_wrench, msg->wrench.quantity.data(), 6*sizeof(double));
     
   } else {
 
    for(int i = 0; i< WRENCH_STATE; i++){ _wrench[i] = 0.0;}
-   memcpy(_wrench, msg->wrench.quantity.data(), 6*sizeof(double));   
+   // memcpy(_wrench, msg->wrench.quantity.data(), 6*sizeof(double));   
    is_valid_wrench = false;
   }
 

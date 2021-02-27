@@ -22,7 +22,7 @@ SOURCE_DIRS_OBJS	= $(SOURCE_DIRS:%=%/$(OBJ_DIR)/*.o)
 
 all: lib examples
 
-clean: clean_lib clean_examples
+clean: clean_lib
 
 lib:
 	@if [ -n "$(SOURCE_DIRS)" ] ; then  \
@@ -43,23 +43,8 @@ clean_lib:
 	fi;
 	$(RM) $(LIB_DIR)/$(TARGETLIB)
 
-examples:
-	@if [ -n "$(EXAMPLE_DIRS)" ] ; then  \
-  	echo " "; \
-	for i in $(EXAMPLE_DIRS); do  \
-		$(MAKE) -C $$i all install; \
-	done; \
-	fi;
-
-clean_examples:
-	@if [ -n "$(EXAMPLE_DIRS)" ] ; then  \
-  	echo " "; \
-	for i in $(EXAMPLE_DIRS); do  \
-		$(MAKE) -C $$i clean uninstall; \
-	done; \
-	fi;
 
 doxygen:
 	cd $(DOC_DIR); doxygen Doxyfile;
 
-.PHONY: all lib examples clean clean_lib clean_examples doxygen
+.PHONY: all lib clean clean_lib doxygen

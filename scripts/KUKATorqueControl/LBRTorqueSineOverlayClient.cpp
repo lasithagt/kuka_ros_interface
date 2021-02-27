@@ -231,18 +231,10 @@ void LBRTorqueSineOverlayClient::command()
   // Check for corre
   robotCommand().setJointPosition(curr_joint_pos);
   if (robotState().getClientCommandMode() == TORQUE) { 
-     
-    // _torques[4]       = 30*(0.01 - curr_joint_pos[4]); // offset;
- 
-    for (int i=0; i<LBRState::NUMBER_OF_JOINTS; i++)
-    {
-        // _torques[i]       = 10*(-joint_pos_desired[i] + curr_joint_pos[i]); // offset;
-      
-    }
+
 
     // Set superposed joint torques
     if (joint_cmd_active) {
-      ROS_INFO_STREAM(_joints[6]);
 
       robotCommand().setJointPosition(_joints);
     } else {
