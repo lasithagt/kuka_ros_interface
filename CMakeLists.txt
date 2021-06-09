@@ -145,7 +145,7 @@ FIND_LIBRARY(FRI_LIBRARIES libFRIClient.a ./lib)
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 
-add_executable(KUKATorqueControl ./scripts/KUKATorqueControl/LBRTorqueSineOverlayClient.h ./scripts/KUKATorqueControl/LBRTorqueSineOverlayApp.cpp ./scripts/KUKATorqueControl/LBRTorqueSineOverlayClient.cpp model/kukaLWR_DHnew.cpp)
+add_executable(KUKATorqueControl ./scripts/KUKATorqueControl/LBRTorqueSineOverlayClient.h ./scripts/KUKATorqueControl/LBRTorqueSineOverlayApp.cpp ./scripts/KUKATorqueControl/LBRTorqueSineOverlayClient.cpp ./scripts/KUKATorqueControl/lpfilter.cpp)
 add_dependencies(KUKATorqueControl iiwa_msgs_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against

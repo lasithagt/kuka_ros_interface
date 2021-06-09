@@ -53,22 +53,29 @@ or otherwise, without the prior written consent of KUKA Roboter GmbH.
 #include <std_msgs/Float32.h>
 #include <std_msgs/Time.h>
 #include <std_msgs/Bool.h>
-
-
-#include <ecl/geometry.hpp>
-#include <ecl/containers.hpp>
-#include <ecl/exceptions.hpp>
-#include <ecl/errors.hpp>
-#include <ecl/concepts.hpp>
-#include <ecl/converters.hpp>
 #include <mutex>
 
-
-#include "low_pass.hpp"
-
-
-
+#include <lpfilter.h>
 using namespace KUKA::FRI;
+
+
+struct State {
+    State()
+    {
+        joint_velocity_raw.reserve(LBRState::NUMBER_OF_JOINTS);
+        joint_velocity_raw.reserve(LBRState::NUMBER_OF_JOINTS);
+    }
+    double current_joint_pos[LBRState::NUMBER_OF_JOINTS];
+    double previous_joint_pos[LBRState::NUMBER_OF_JOINTS];
+    double joint_pos_desired[LBRState::NUMBER_OF_JOINTS];
+    double current_joint_velocity[LBRState::NUMBER_OF_JOINTS];
+    double joint_measure_torque[LBRState::NUMBER_OF_JOINTS];
+    double joint_commanded[LBRState::NUMBER_OF_JOINTS];
+    double joint_ext_torque[LBRState::NUMBER_OF_JOINTS];
+    std::vector<double> joint_velocity_raw;
+    std::vector<double> joint_velocity_filtered;
+};
+
 
 /**
  * \brief Test client that superposes joint torques with sine waves.
@@ -112,7 +119,7 @@ public:
 
    virtual void monitor();
 
-   virtual void publishState(double jointExtTorque[], double jointTorque[], double jointState[], double jointStateCommanded[], double jointVelocity[], std_msgs::Time t);
+   virtual void publishState(const State& robotState, std_msgs::Time t);
 
    virtual void getKUKATorqueCmd(const ros::MessageEvent<iiwa_msgs::JointTorque const>& event);
 
@@ -120,12 +127,14 @@ public:
 
    void is_command_active(const std_msgs::Bool::ConstPtr& msg); 
 
-   void computeVelocity(double curr_joint_pos[], double* vel_measured);
+   bool isSafe();
+
+   void computeVelocity(State& robotState);
       
 private:
       
-   double _torques[LBRState::NUMBER_OF_JOINTS]; //!< commanded superposed torques
-   double _joints[LBRState::NUMBER_OF_JOINTS];
+   double torques_[LBRState::NUMBER_OF_JOINTS]; //!< commanded superposed torques
+   double jointPositionsCommand[LBRState::NUMBER_OF_JOINTS];
    double sample_time;
 
    bool is_valid;
@@ -144,10 +153,8 @@ private:
    ros::Publisher pub_position_com;
    ros::Publisher pub_torque;
    ros::Publisher pub_ext_torque;
-   ros::Publisher joint_vel_pub_;
+   ros::Publisher pub_velocity;
    ros::Publisher pub_kuka_time;
-
-   int n_position_history;
 
    std_msgs::Time curr_time;
 
@@ -157,15 +164,8 @@ private:
    iiwa_msgs::JointPosition kukaPositionCommanded;
    iiwa_msgs::JointVelocity kukaVelocity;
 
-   DiscreteTimeLowPassFilter<double>* lp_filter;
-
-
-   Eigen::Matrix<double, 7, 5> temp_joint_pos;
-   Eigen::Matrix<double, 7, 4> temp_joint_vel;
-   
-   Eigen::Matrix<double,4,1> filter_weights;
-   Eigen::Matrix<double,7,1> curr_velocity;
-
+   State kukaState;
+   LPFilter lowPassFilter;
    std::mutex mtx;
 
 };

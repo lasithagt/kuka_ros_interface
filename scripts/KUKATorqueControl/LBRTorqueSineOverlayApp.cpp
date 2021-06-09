@@ -37,7 +37,7 @@ or otherwise, without the prior written consent of KUKA Roboter GmbH.
 */
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h> // strstr
+#include <string.h>
 #include "LBRTorqueSineOverlayClient.h"
 #include "friUdpConnection.h"
 #include "friClientApplication.h"
@@ -84,7 +84,7 @@ int main (int argc, char** argv)
    /*                                                                         */
    /**************************************************************************/
    
-   const std::string node_name = "KukaTorqueControl_node";
+   const std::string node_name = "KukaTorqueControlNode";
    ros::init(argc, argv, node_name);
    ros::NodeHandle nh("~");
    
