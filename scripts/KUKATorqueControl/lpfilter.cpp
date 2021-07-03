@@ -13,6 +13,7 @@ THIS SOFTWARE IS PROVIDED BY LOS ALAMOS NATIONAL SECURITY, LLC AND CONTRIBUTORS 
 Author: Alex von Sternberg
 */
 
+#include <stdio.h>
 #include <lpfilter.h>
 
 LPFilter::LPFilter(double deltaT, double cutoffFrequency, int numElements):
@@ -59,6 +60,15 @@ LPFilter::LPFilter(double deltaT, double cutoffFrequency, int numElements):
     in2.resize(noElements);
     out1.resize(noElements);
     out2.resize(noElements);
+
+    for (int i = 0;i < noElements; i++)
+    {
+      in1.at(i) = 0;
+      in2.at(i) = 0;
+      out1.at(i) = 0;
+      out2.at(i) = 0;
+    }
+
     ROS_INFO_STREAM("cutoffFrequency: " << cutoffFrequency << ". omega_a: " << omega_a << ". den: " << den << ". a0: " << a0 << ". a1: " << a1 << ". a2: " << a2 << ". b1: " << b1 << ". b2: " << b2);
   }
 }
@@ -77,7 +87,8 @@ bool LPFilter::update(std::vector<double> input, std::vector<double>& output)
   }
   for(int i=0; i<noElements; i++)
   {
-    output.at(i) = a0*input.at(i) + a1*in1.at(i) + a2*in2.at(i) - b1*out1.at(i) - b2*out2.at(i);
+    auto temp = a0*input.at(i) + a1*in1.at(i) + a2*in2.at(i) - b1*out1.at(i) - b2*out2.at(i);
+    output.at(i) = temp;
     out2.at(i) = out1.at(i);
     out1.at(i) = output.at(i);
     in2.at(i) = in1.at(i);

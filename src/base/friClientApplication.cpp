@@ -128,16 +128,21 @@ bool ClientApplication::step()
    switch (currentState)
    {
       case MONITORING_WAIT:
+         printf("Waiting!\n");
       case MONITORING_READY:
+         printf("Monitoring...!\n");
          _client.monitor();
          break;
       case COMMANDING_WAIT:
+         printf("Commanding Waiting!\n");
          _client.waitForCommand();
          break;
       case COMMANDING_ACTIVE:
+         printf("Commanding!\n");
          _client.command();
          break;
       case IDLE:
+         printf("Idle!\n");
       default:
          return true; // nothing to send back
    }

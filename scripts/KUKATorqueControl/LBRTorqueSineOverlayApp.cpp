@@ -125,7 +125,7 @@ int main (int argc, char** argv)
 
    bool success = true;
 
-   while (success & !ros::isShuttingDown())
+   while (success & ros::ok())
    {
       success = app.step();
    }
@@ -139,6 +139,7 @@ int main (int argc, char** argv)
 
    // disconnect from controller
    app.disconnect();
-   ros::waitForShutdown();
+   printf("\nDisconneted from KUKA Controller...\n");
+
    return 1;
 }

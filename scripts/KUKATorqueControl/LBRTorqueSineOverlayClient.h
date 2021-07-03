@@ -55,15 +55,16 @@ or otherwise, without the prior written consent of KUKA Roboter GmbH.
 #include <std_msgs/Bool.h>
 #include <mutex>
 
-#include <lpfilter.h>
 using namespace KUKA::FRI;
 
 
 struct State {
     State()
     {
-        joint_velocity_raw.reserve(LBRState::NUMBER_OF_JOINTS);
-        joint_velocity_raw.reserve(LBRState::NUMBER_OF_JOINTS);
+        ROS_INFO_STREAM("KUKA LBR State Initialized ...\n");
+
+        joint_velocity_raw.resize(LBRState::NUMBER_OF_JOINTS);
+        joint_velocity_filtered.resize(LBRState::NUMBER_OF_JOINTS);
     }
     double current_joint_pos[LBRState::NUMBER_OF_JOINTS];
     double previous_joint_pos[LBRState::NUMBER_OF_JOINTS];
@@ -165,7 +166,6 @@ private:
    iiwa_msgs::JointVelocity kukaVelocity;
 
    State kukaState;
-   LPFilter lowPassFilter;
    std::mutex mtx;
 
 };

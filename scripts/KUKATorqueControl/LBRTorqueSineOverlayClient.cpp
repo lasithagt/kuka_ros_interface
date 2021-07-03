@@ -55,7 +55,7 @@ LBRTorqueSineOverlayClient::LBRTorqueSineOverlayClient(ros::NodeHandle &nh)
    ,is_command(false)
    ,joint_cmd_active(false)
 {
-  printf("KUKA LBR initialized ...\n");
+  ROS_INFO_STREAM("KUKA LBR initialized ...\n");
 
   // Subscribers
   sub_command_torque = nh.subscribe("/kuka/command/command_torque", 1, &LBRTorqueSineOverlayClient::getKUKATorqueCmd, this);
@@ -77,16 +77,14 @@ LBRTorqueSineOverlayClient::LBRTorqueSineOverlayClient(ros::NodeHandle &nh)
   kukaPositionCommanded.position.quantity.resize(LBRState::NUMBER_OF_JOINTS);
   kukaVelocity.velocity.quantity.resize(LBRState::NUMBER_OF_JOINTS);
 
-  // get sample time
-  sample_time = robotState().getSampleTime();
-
   // initialize the torque
   for(int i = 0; i< LBRState::NUMBER_OF_JOINTS; i++){ torques_[i] = 0.0;}
 
 
-  // Initialize filters.
-  const double cutoff_hz = 20;
-  lowPassFilter = LPFilter(sample_time, cutoff_hz, LBRState::NUMBER_OF_JOINTS);
+  // get sample time
+  // sample_time = 0.001; // robotState().getSampleTime();
+
+
 
 }
 
@@ -102,7 +100,12 @@ void LBRTorqueSineOverlayClient::onStateChange(ESessionState oldState, ESessionS
    {
       case MONITORING_READY:
       {
-         for(int i = 0; i< LBRState::NUMBER_OF_JOINTS; i++){ torques_[i] = 0.0;}
+        sample_time = robotState().getSampleTime();
+
+        // Initialize filters.
+        for(int i = 0; i< LBRState::NUMBER_OF_JOINTS; i++) { 
+          torques_[i] = 0.0;
+        }
          break;
       }
       default:
@@ -138,6 +141,7 @@ void LBRTorqueSineOverlayClient::monitor() {
  */
 void LBRTorqueSineOverlayClient::publishState(const State& robotState, std_msgs::Time kuka_time)
 {
+
   memcpy(kukaExtTorque.torque.quantity.data(), robotState.joint_ext_torque, 7*sizeof(double));
   kukaExtTorque.header.stamp = ros::Time::now();
 
@@ -215,13 +219,18 @@ Implementation of the computation of the velocity from finite difference and a w
 */
 void LBRTorqueSineOverlayClient::computeVelocity(State& robotState) {
     // estimate the velocity
+
     for (int i = 0; i < LBRState::NUMBER_OF_JOINTS; i++)
     {
-        robotState.joint_velocity_raw.at(i) = (robotState.current_joint_pos[i] - robotState.previous_joint_pos[i]) / sample_time;
+        robotState.joint_velocity_raw.at(i) = robotState.joint_velocity_filtered.at(i);
+        auto temp = (robotState.current_joint_pos[i] - robotState.previous_joint_pos[i]) / sample_time;
+        robotState.joint_velocity_filtered.at(i) = temp;
     }
 
-    // filter the velocity
-    lowPassFilter.update(robotState.joint_velocity_raw, robotState.joint_velocity_filtered);
+    for (int i = 0; i < LBRState::NUMBER_OF_JOINTS; i++)
+    {
+        robotState.current_joint_velocity[i] = 0.99*robotState.joint_velocity_filtered.at(i) + 0.01*robotState.joint_velocity_raw.at(i);
+    }
 }
 
 // This function is to compute the joint position input to the KUKA arm.
