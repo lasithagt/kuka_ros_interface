@@ -1,0 +1,8 @@
+.idea/
+cmake-build-debug/
+*.o
+
+*.pb.o
+*.bag
+*.cmake
+*.a
