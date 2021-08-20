@@ -248,7 +248,6 @@ void LBRTorqueSineOverlayClient::getKUKAJointCmd(const ros::MessageEvent<iiwa_ms
       jointPositionsCommand[i] = msg->position.quantity.at(i);
   }
 
-  // isSafe(jointPositionCommand);
 
 }
 
